@@ -106,7 +106,12 @@ export default function AdminPage() {
 /* ============ POSTS ============ */
 function PostsTab() {
   const [search, setSearch] = useState('');
-  const filtered = mockPosts.filter(p => p.title.toLowerCase().includes(search.toLowerCase()));
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const filtered = mockPosts.filter(p => {
+    const matchSearch = p.title.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   return (
     <div>
