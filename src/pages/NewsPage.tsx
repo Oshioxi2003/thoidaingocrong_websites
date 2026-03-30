@@ -3,6 +3,7 @@ import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import bgNews from '@/assets/bg-news.jpg';
 
 const allNews = Array.from({ length: 12 }, (_, i) => ({
@@ -81,12 +82,12 @@ export default function NewsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {paged.map((item, i) => (
             <AnimatedSection key={item.id} delay={i * 0.05}>
-              <div className="group rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+              <Link to={`/news/${item.id}`} className="group block rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
                 <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">{item.tag}</span>
                 <h3 className="mt-3 font-display text-lg font-semibold text-foreground transition-colors group-hover:text-primary">{item.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{item.excerpt}</p>
                 <p className="mt-3 text-xs text-muted-foreground">{item.date}</p>
-              </div>
+              </Link>
             </AnimatedSection>
           ))}
         </div>

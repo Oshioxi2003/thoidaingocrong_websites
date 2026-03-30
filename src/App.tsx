@@ -9,6 +9,7 @@ import HomePage from "@/pages/HomePage";
 import AboutPage from "@/pages/AboutPage";
 import DownloadPage from "@/pages/DownloadPage";
 import NewsPage from "@/pages/NewsPage";
+import PostDetailPage from "@/pages/PostDetailPage";
 import EventsPage from "@/pages/EventsPage";
 import GiftcodePage from "@/pages/GiftcodePage";
 import CommunityPage from "@/pages/CommunityPage";
@@ -41,6 +42,7 @@ const App = () => {
             <Route path="/about" element={<Layout isDark={isDark} onToggleTheme={toggle}><AboutPage /></Layout>} />
             <Route path="/download" element={<Layout isDark={isDark} onToggleTheme={toggle}><DownloadPage /></Layout>} />
             <Route path="/news" element={<Layout isDark={isDark} onToggleTheme={toggle}><NewsPage /></Layout>} />
+            <Route path="/news/:id" element={<Layout isDark={isDark} onToggleTheme={toggle}><PostDetailPage /></Layout>} />
             <Route path="/events" element={<Layout isDark={isDark} onToggleTheme={toggle}><EventsPage /></Layout>} />
             <Route path="/giftcode" element={<Layout isDark={isDark} onToggleTheme={toggle}><GiftcodePage /></Layout>} />
             <Route path="/community" element={<Layout isDark={isDark} onToggleTheme={toggle}><CommunityPage /></Layout>} />
