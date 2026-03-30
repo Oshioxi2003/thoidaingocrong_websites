@@ -1,27 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Users, Gift, BarChart3,
+  FileText, Users, Gift,
   ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-
-// Mock Data
-const statsData = [
-  { name: 'T1', users: 1200, downloads: 3400 },
-  { name: 'T2', users: 1800, downloads: 4200 },
-  { name: 'T3', users: 2400, downloads: 5100 },
-  { name: 'T4', users: 3100, downloads: 6800 },
-  { name: 'T5', users: 4200, downloads: 8200 },
-  { name: 'T6', users: 5500, downloads: 10400 },
-];
-
-const platformData = [
-  { name: 'Android', value: 45, color: 'hsl(142, 76%, 36%)' },
-  { name: 'iOS', value: 30, color: 'hsl(217, 91%, 60%)' },
-  { name: 'PC', value: 25, color: 'hsl(30, 90%, 50%)' },
-];
 
 const mockPosts = [
   { id: 1, title: 'Phiên bản 3.0 chính thức ra mắt', status: 'published', date: '28/03/2026', views: 12400 },
@@ -46,17 +29,16 @@ const mockGiftcodes = [
   { id: 4, code: 'DRAGONBALL7', reward: '1000 KC + SSR', uses: 50, maxUses: 100, status: 'active' },
 ];
 
-type Tab = 'overview' | 'posts' | 'users' | 'giftcodes';
+type Tab = 'posts' | 'users' | 'giftcodes';
 
-const tabs: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-  { key: 'overview', label: 'Tổng quan', icon: BarChart3 },
+const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'posts', label: 'Bài viết', icon: FileText },
   { key: 'users', label: 'Người dùng', icon: Users },
   { key: 'giftcodes', label: 'Giftcode', icon: Gift },
 ];
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>('posts');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -112,125 +94,11 @@ export default function AdminPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'posts' && <PostsTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'giftcodes' && <GiftcodesTab />}
         </motion.div>
       </main>
-    </div>
-  );
-}
-
-/* ============ OVERVIEW ============ */
-function OverviewTab() {
-  const stats = [
-    { label: 'Tổng người dùng', value: '52,400', change: '+12%', color: 'text-primary' },
-    { label: 'Lượt tải hôm nay', value: '1,280', change: '+8%', color: 'text-emerald-500' },
-    { label: 'Bài viết', value: '156', change: '+3', color: 'text-blue-500' },
-    { label: 'Giftcode hoạt động', value: '12', change: '4 hết hạn', color: 'text-amber-500' },
-  ];
-
-  return (
-    <div>
-      <h2 className="mb-6 font-display text-2xl font-bold text-foreground">Tổng quan</h2>
-
-      {/* Stats Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s, i) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="rounded-2xl border border-border bg-card p-5 shadow-card"
-          >
-            <p className="text-sm text-muted-foreground">{s.label}</p>
-            <p className={`mt-1 font-display text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{s.change}</p>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Bar Chart - Users & Downloads */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h3 className="mb-4 font-display text-lg font-semibold text-foreground">Người dùng & Lượt tải</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={statsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  background: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '12px',
-                  color: 'hsl(var(--foreground))',
-                }}
-              />
-              <Bar dataKey="users" fill="hsl(30, 90%, 50%)" radius={[6, 6, 0, 0]} name="Người dùng" />
-              <Bar dataKey="downloads" fill="hsl(15, 85%, 55%)" radius={[6, 6, 0, 0]} name="Lượt tải" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Line Chart */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h3 className="mb-4 font-display text-lg font-semibold text-foreground">Tăng trưởng người dùng</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={statsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  background: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '12px',
-                  color: 'hsl(var(--foreground))',
-                }}
-              />
-              <Line type="monotone" dataKey="users" stroke="hsl(30, 90%, 50%)" strokeWidth={3} dot={{ fill: 'hsl(30, 90%, 50%)', r: 5 }} name="Người dùng" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Pie Chart */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h3 className="mb-4 font-display text-lg font-semibold text-foreground">Nền tảng tải</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie data={platformData} cx="50%" cy="50%" innerRadius={70} outerRadius={110} paddingAngle={4} dataKey="value" label={({ name, value }) => `${name} ${value}%`}>
-                {platformData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Recent activity */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h3 className="mb-4 font-display text-lg font-semibold text-foreground">Hoạt động gần đây</h3>
-          <div className="space-y-4">
-            {[
-              { text: 'Bài viết "Phiên bản 3.0" đã được xuất bản', time: '2 phút trước' },
-              { text: 'Người dùng mới: Vegeta_Pro đã đăng ký', time: '15 phút trước' },
-              { text: 'Giftcode NGOCRONGVIP đã được sử dụng 50 lần', time: '1 giờ trước' },
-              { text: 'Báo cáo từ người dùng Piccolo_X', time: '3 giờ trước' },
-              { text: 'Sự kiện "Lễ Hội Ngọc Rồng" đã bắt đầu', time: '5 giờ trước' },
-            ].map((a, i) => (
-              <div key={i} className="flex items-start justify-between gap-4 border-b border-border/50 pb-3 last:border-0">
-                <p className="text-sm text-foreground">{a.text}</p>
-                <span className="shrink-0 text-xs text-muted-foreground">{a.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
