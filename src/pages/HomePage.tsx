@@ -24,8 +24,48 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img src={heroBgExtended} alt="" className="h-full w-full object-cover" />
+          <motion.img
+            src={heroBgExtended}
+            alt=""
+            className="h-full w-full object-cover"
+            animate={{ scale: [1, 1.08, 1], x: [0, -15, 0], y: [0, -10, 0] }}
+            transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
+          />
           <div className="absolute inset-0 bg-background/30 dark:bg-background/50" />
+
+          {/* Animated energy particles */}
+          {[...Array(12)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                width: `${4 + Math.random() * 6}px`,
+                height: `${4 + Math.random() * 6}px`,
+                left: `${5 + (i * 8)}%`,
+                bottom: `${10 + Math.random() * 40}%`,
+                background: `radial-gradient(circle, hsl(30 90% 60% / 0.8), hsl(15 85% 55% / 0))`,
+              }}
+              animate={{
+                y: [0, -120 - Math.random() * 200],
+                opacity: [0, 0.9, 0],
+                scale: [0.5, 1.2, 0.3],
+              }}
+              transition={{
+                duration: 4 + Math.random() * 4,
+                repeat: Infinity,
+                delay: Math.random() * 5,
+                ease: 'easeOut',
+              }}
+            />
+          ))}
+
+          {/* Pulsing glow overlay */}
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse at 50% 60%, hsl(30 90% 50% / 0.08), transparent 70%)' }}
+            animate={{ opacity: [0.3, 0.7, 0.3] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          />
         </div>
         <div className="container mx-auto flex min-h-[85vh] flex-col items-center justify-center px-4 text-center">
           <motion.div
