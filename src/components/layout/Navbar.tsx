@@ -48,6 +48,12 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/auth"
+            className="gradient-fire hidden items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-105 md:inline-flex"
+          >
+            Đăng nhập
+          </Link>
           <button
             onClick={onToggleTheme}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
