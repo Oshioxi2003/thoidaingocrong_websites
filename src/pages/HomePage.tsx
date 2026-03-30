@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import heroCharacter from '@/assets/hero-character.jpg';
+import heroBgExtended from '@/assets/hero-bg-extended.jpg';
 
 const newsItems = [
   { id: 1, title: 'Cập nhật phiên bản 3.0 — Sức mạnh mới', date: '28/03/2026', tag: 'Update' },
@@ -21,7 +22,11 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="relative overflow-hidden gradient-hero">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img src={heroBgExtended} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-background/30 dark:bg-background/50" />
+        </div>
         <div className="container mx-auto flex min-h-[85vh] flex-col items-center justify-center px-4 text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
