@@ -34,7 +34,7 @@ export default function AboutPage() {
         </AnimatedSection>
 
         {/* Values */}
-        <div className="mb-20 grid gap-6 md:grid-cols-4">
+        <div className="mb-20 grid gap-6 grid-cols-2">
           {values.map((v, i) => (
             <AnimatedSection key={v.title} delay={i * 0.1}>
               <div className="rounded-2xl border border-border bg-card p-6 text-center transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
