@@ -10,12 +10,6 @@ const platforms = [
   { icon: Monitor, name: 'PC', version: 'Windows 10+', size: '1.2 GB', link: '#' },
 ];
 
-const specs = [
-  { label: 'RAM tối thiểu', value: '3 GB' },
-  { label: 'Bộ nhớ trống', value: '2 GB' },
-  { label: 'Kết nối', value: 'Wi-Fi / 4G' },
-  { label: 'GPU', value: 'Mali-G72 / Adreno 530+' },
-];
 
 export default function DownloadPage() {
   return (
@@ -40,20 +34,6 @@ export default function DownloadPage() {
           ))}
         </div>
 
-        {/* Specs */}
-        <AnimatedSection>
-          <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-8">
-            <h3 className="mb-6 font-display text-xl font-semibold text-foreground text-center">Yêu cầu cấu hình</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {specs.map(s => (
-                <div key={s.label} className="rounded-xl bg-muted p-4">
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                  <p className="mt-1 font-display text-sm font-semibold text-foreground">{s.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </AnimatedSection>
 
         {/* QR Code */}
         <AnimatedSection className="mt-16 text-center">
