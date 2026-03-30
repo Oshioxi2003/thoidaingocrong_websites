@@ -1,6 +1,8 @@
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { Smartphone, Monitor, Apple, QrCode } from 'lucide-react';
+import bgDownload from '@/assets/bg-download.jpg';
 
 const platforms = [
   { icon: Smartphone, name: 'Android', version: 'Android 8.0+', size: '450 MB', link: '#' },

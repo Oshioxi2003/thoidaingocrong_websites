@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import bgNews from '@/assets/bg-news.jpg';
 
 const allNews = Array.from({ length: 12 }, (_, i) => ({
   id: i + 1,

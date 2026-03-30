@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { Clock, Flame } from 'lucide-react';
+import bgEvents from '@/assets/bg-events.jpg';
 
 const events = [
   { id: 1, title: 'Lễ Hội Ngọc Rồng', desc: 'Nhận x2 phần thưởng mỗi ngày đăng nhập, quay thưởng miễn phí và nhiều vật phẩm giá trị.', badge: 'HOT', endsIn: 3 * 24 * 3600 },
