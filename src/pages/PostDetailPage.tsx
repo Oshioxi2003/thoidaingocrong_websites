@@ -20,7 +20,7 @@ const allPosts = Array.from({ length: 12 }, (_, i) => ({
     'Sự kiện kỷ niệm 1 năm',
   ][i],
   date: `${28 - i}/03/2026`,
-  tag: ['Update', 'Tournament', 'New', 'Event', 'Update', 'Guide', 'Guide', 'Notice', 'New', 'Feature', 'Update', 'Event'][i],
+  tag: ['Cập nhật', 'Giải đấu', 'Mới', 'Sự kiện', 'Cập nhật', 'Hướng dẫn', 'Hướng dẫn', 'Thông báo', 'Mới', 'Tính năng', 'Cập nhật', 'Sự kiện'][i],
   readTime: `${3 + (i % 5)} phút đọc`,
   cover: `https://images.unsplash.com/photo-${[
     '1534996858221-380b92700493',
