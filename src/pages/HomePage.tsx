@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import heroCharacter from '@/assets/hero-character.jpg';
+import heroBgExtended from '@/assets/hero-bg-extended.jpg';
 
 const newsItems = [
   { id: 1, title: 'Cập nhật phiên bản 3.0 — Sức mạnh mới', date: '28/03/2026', tag: 'Update' },
