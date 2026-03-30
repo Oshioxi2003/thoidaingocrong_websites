@@ -46,8 +46,6 @@ const App = () => {
             <Route path="/community" element={<Layout isDark={isDark} onToggleTheme={toggle}><CommunityPage /></Layout>} />
             <Route path="*" element={<Layout isDark={isDark} onToggleTheme={toggle}><NotFound /></Layout>} />
           </Routes>
-            </Routes>
-          </Layout>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
