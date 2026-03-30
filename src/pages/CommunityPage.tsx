@@ -1,6 +1,8 @@
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { MessageCircle, Users, ExternalLink } from 'lucide-react';
+import bgCommunity from '@/assets/bg-community.jpg';
 
 const communities = [
   { name: 'Facebook Group', desc: 'Tham gia cộng đồng 50.000+ thành viên trên Facebook', url: '#', icon: Users, members: '50K+' },
@@ -16,6 +18,7 @@ const posts = [
 
 export default function CommunityPage() {
   return (
+    <PageBackground src={bgCommunity}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Cộng đồng" subtitle="Kết nối với hàng nghìn chiến binh" />
@@ -65,5 +68,6 @@ export default function CommunityPage() {
         </AnimatedSection>
       </div>
     </div>
+    </PageBackground>
   );
 }
