@@ -122,14 +122,27 @@ function PostsTab() {
         </button>
       </div>
 
-      <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
-        <Search size={18} className="text-muted-foreground" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Tìm kiếm bài viết..."
-          className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-        />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+          <Search size={18} className="text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm kiếm bài viết..."
+            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="flex gap-2">
+          {[{ key: 'all', label: 'Tất cả' }, { key: 'published', label: 'Đã xuất bản' }, { key: 'draft', label: 'Bản nháp' }].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+              }`}
+            >{f.label}</button>
+          ))}
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-card">
