@@ -49,6 +49,7 @@ function EventCard({ event, index }: { event: typeof events[0]; index: number })
 
 export default function EventsPage() {
   return (
+    <PageBackground src={bgEvents}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Sự kiện" subtitle="Tham gia ngay để không bỏ lỡ phần thưởng" />
@@ -59,5 +60,6 @@ export default function EventsPage() {
         </div>
       </div>
     </div>
+    </PageBackground>
   );
 }

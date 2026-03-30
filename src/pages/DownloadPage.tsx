@@ -19,6 +19,7 @@ const specs = [
 
 export default function DownloadPage() {
   return (
+    <PageBackground src={bgDownload}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Tải Game" subtitle="Chọn nền tảng và bắt đầu cuộc phiêu lưu" />
@@ -63,5 +64,6 @@ export default function DownloadPage() {
         </AnimatedSection>
       </div>
     </div>
+    </PageBackground>
   );
 }

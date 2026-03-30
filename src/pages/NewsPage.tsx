@@ -44,6 +44,7 @@ export default function NewsPage() {
   const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   return (
+    <PageBackground src={bgNews}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Tin tức" subtitle="Tin tức và cập nhật mới nhất" />
@@ -112,5 +113,6 @@ export default function NewsPage() {
         )}
       </div>
     </div>
+    </PageBackground>
   );
 }
