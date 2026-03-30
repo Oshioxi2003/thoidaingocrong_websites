@@ -187,6 +187,17 @@ function PostsTab() {
 
 /* ============ USERS ============ */
 function UsersTab() {
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const filtered = mockUsers.filter(u => {
+    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    const matchStatus = statusFilter === 'all' || u.status === statusFilter;
+    return matchSearch && matchRole && matchStatus;
+  });
+
   const roleBadge = (role: string) => {
     const colors: Record<string, string> = {
       admin: 'bg-primary/10 text-primary',
@@ -199,6 +210,40 @@ function UsersTab() {
   return (
     <div>
       <h2 className="mb-6 font-display text-2xl font-bold text-foreground">Quản lý người dùng</h2>
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+          <Search size={18} className="text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm theo tên hoặc email..."
+            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="flex gap-2">
+          {[{ key: 'all', label: 'Tất cả' }, { key: 'admin', label: 'Admin' }, { key: 'moderator', label: 'Mod' }, { key: 'user', label: 'User' }].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setRoleFilter(f.key)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                roleFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+              }`}
+            >{f.label}</button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {[{ key: 'all', label: 'Tất cả' }, { key: 'active', label: 'Hoạt động' }, { key: 'banned', label: 'Bị cấm' }].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+              }`}
+            >{f.label}</button>
+          ))}
+        </div>
+      </div>
 
       <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-card">
         <table className="w-full text-sm">
@@ -213,7 +258,7 @@ function UsersTab() {
             </tr>
           </thead>
           <tbody>
-            {mockUsers.map(user => (
+            {filtered.map(user => (
               <tr key={user.id} className="border-b border-border/50 transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium text-foreground">{user.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
@@ -245,6 +290,15 @@ function UsersTab() {
 
 /* ============ GIFTCODES ============ */
 function GiftcodesTab() {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const filtered = mockGiftcodes.filter(gc => {
+    const matchSearch = gc.code.toLowerCase().includes(search.toLowerCase()) || gc.reward.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || gc.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -254,8 +308,31 @@ function GiftcodesTab() {
         </button>
       </div>
 
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+          <Search size={18} className="text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm theo mã hoặc phần thưởng..."
+            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="flex gap-2">
+          {[{ key: 'all', label: 'Tất cả' }, { key: 'active', label: 'Hoạt động' }, { key: 'expired', label: 'Hết hạn' }].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+              }`}
+            >{f.label}</button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
-        {mockGiftcodes.map((gc, i) => (
+        {filtered.map((gc, i) => (
           <motion.div
             key={gc.id}
             initial={{ opacity: 0, y: 20 }}
