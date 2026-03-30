@@ -27,6 +27,8 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
+          <BackToTop />
           <Layout isDark={isDark} onToggleTheme={toggle}>
             <Routes>
               <Route path="/" element={<HomePage />} />
