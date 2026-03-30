@@ -1,6 +1,8 @@
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { Smartphone, Monitor, Apple, QrCode } from 'lucide-react';
+import bgDownload from '@/assets/bg-download.jpg';
 
 const platforms = [
   { icon: Smartphone, name: 'Android', version: 'Android 8.0+', size: '450 MB', link: '#' },
@@ -17,6 +19,7 @@ const specs = [
 
 export default function DownloadPage() {
   return (
+    <PageBackground src={bgDownload}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Tải Game" subtitle="Chọn nền tảng và bắt đầu cuộc phiêu lưu" />
@@ -61,5 +64,6 @@ export default function DownloadPage() {
         </AnimatedSection>
       </div>
     </div>
+    </PageBackground>
   );
 }
