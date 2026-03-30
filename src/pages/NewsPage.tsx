@@ -23,11 +23,11 @@ const allNews = Array.from({ length: 12 }, (_, i) => ({
     'Sự kiện kỷ niệm 1 năm',
   ][i],
   date: `${28 - i}/03/2026`,
-  tag: ['Update', 'Tournament', 'New', 'Event', 'Update', 'Guide', 'Guide', 'Notice', 'New', 'Feature', 'Update', 'Event'][i],
+  tag: ['Cập nhật', 'Giải đấu', 'Mới', 'Sự kiện', 'Cập nhật', 'Hướng dẫn', 'Hướng dẫn', 'Thông báo', 'Mới', 'Tính năng', 'Cập nhật', 'Sự kiện'][i],
   excerpt: 'Khám phá những thay đổi mới nhất trong thế giới Ngọc Rồng với những tính năng đột phá...',
 }));
 
-const TAGS = ['Tất cả', 'Update', 'Tournament', 'New', 'Event', 'Guide', 'Notice', 'Feature'];
+const TAGS = ['Tất cả', 'Cập nhật', 'Giải đấu', 'Mới', 'Sự kiện', 'Hướng dẫn', 'Thông báo', 'Tính năng'];
 const PER_PAGE = 6;
 
 export default function NewsPage() {
