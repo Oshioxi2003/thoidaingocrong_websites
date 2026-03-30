@@ -13,6 +13,8 @@ import EventsPage from "@/pages/EventsPage";
 import GiftcodePage from "@/pages/GiftcodePage";
 import CommunityPage from "@/pages/CommunityPage";
 import NotFound from "./pages/NotFound.tsx";
+import ScrollToTop from "./components/ScrollToTop";
+import BackToTop from "./components/shared/BackToTop";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +27,8 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
+          <BackToTop />
           <Layout isDark={isDark} onToggleTheme={toggle}>
             <Routes>
               <Route path="/" element={<HomePage />} />
