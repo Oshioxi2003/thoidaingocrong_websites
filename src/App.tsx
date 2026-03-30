@@ -12,6 +12,8 @@ import NewsPage from "@/pages/NewsPage";
 import EventsPage from "@/pages/EventsPage";
 import GiftcodePage from "@/pages/GiftcodePage";
 import CommunityPage from "@/pages/CommunityPage";
+import AuthPage from "@/pages/AuthPage";
+import AdminPage from "@/pages/AdminPage";
 import NotFound from "./pages/NotFound.tsx";
 import ScrollToTop from "./components/ScrollToTop";
 import BackToTop from "./components/shared/BackToTop";
@@ -29,18 +31,21 @@ const App = () => {
         <BrowserRouter>
           <ScrollToTop />
           <BackToTop />
-          <Layout isDark={isDark} onToggleTheme={toggle}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/download" element={<DownloadPage />} />
-              <Route path="/news" element={<NewsPage />} />
-              <Route path="/events" element={<EventsPage />} />
-              <Route path="/giftcode" element={<GiftcodePage />} />
-              <Route path="/community" element={<CommunityPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
+          <Routes>
+            {/* Auth page - no layout */}
+            <Route path="/auth" element={<AuthPage />} />
+            {/* Admin page - own layout */}
+            <Route path="/admin" element={<Layout isDark={isDark} onToggleTheme={toggle}><AdminPage /></Layout>} />
+            {/* Public pages with layout */}
+            <Route path="/" element={<Layout isDark={isDark} onToggleTheme={toggle}><HomePage /></Layout>} />
+            <Route path="/about" element={<Layout isDark={isDark} onToggleTheme={toggle}><AboutPage /></Layout>} />
+            <Route path="/download" element={<Layout isDark={isDark} onToggleTheme={toggle}><DownloadPage /></Layout>} />
+            <Route path="/news" element={<Layout isDark={isDark} onToggleTheme={toggle}><NewsPage /></Layout>} />
+            <Route path="/events" element={<Layout isDark={isDark} onToggleTheme={toggle}><EventsPage /></Layout>} />
+            <Route path="/giftcode" element={<Layout isDark={isDark} onToggleTheme={toggle}><GiftcodePage /></Layout>} />
+            <Route path="/community" element={<Layout isDark={isDark} onToggleTheme={toggle}><CommunityPage /></Layout>} />
+            <Route path="*" element={<Layout isDark={isDark} onToggleTheme={toggle}><NotFound /></Layout>} />
+          </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
