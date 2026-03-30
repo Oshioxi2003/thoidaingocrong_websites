@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { Gift, Check, X, Copy } from 'lucide-react';
+import bgGiftcode from '@/assets/bg-giftcode.jpg';
 
 const publicCodes = [
   { code: 'NGOCRONGVIP', reward: '500 Kim Cương + 10 Ngọc Rồng', status: 'active' },
@@ -29,6 +31,7 @@ export default function GiftcodePage() {
   };
 
   return (
+    <PageBackground src={bgGiftcode}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Giftcode" subtitle="Nhập mã để nhận quà miễn phí" />
@@ -97,5 +100,6 @@ export default function GiftcodePage() {
         </AnimatedSection>
       </div>
     </div>
+    </PageBackground>
   );
 }

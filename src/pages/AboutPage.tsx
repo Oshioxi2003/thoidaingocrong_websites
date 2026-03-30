@@ -1,6 +1,8 @@
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
+import PageBackground from '@/components/shared/PageBackground';
 import { Sparkles, Target, Users, Zap } from 'lucide-react';
+import bgAbout from '@/assets/bg-about.jpg';
 
 const timeline = [
   { year: '2023', title: 'Ý tưởng ra đời', desc: 'Khởi nguồn từ niềm đam mê Dragon Ball' },
@@ -18,6 +20,7 @@ const values = [
 
 export default function AboutPage() {
   return (
+    <PageBackground src={bgAbout}>
     <div className="py-20">
       <div className="container mx-auto px-4">
         <SectionTitle title="Về Thời Đại Ngọc Rồng" subtitle="Câu chuyện đằng sau thế giới huyền thoại" />
@@ -63,5 +66,6 @@ export default function AboutPage() {
         </div>
       </div>
     </div>
+    </PageBackground>
   );
 }
