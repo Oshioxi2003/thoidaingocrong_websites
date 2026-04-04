@@ -1,74 +1,98 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import AnimatedSection from '@/components/shared/AnimatedSection';
-import { ArrowLeft, Calendar, Tag, Clock, Share2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Tag, Share2, ChevronRight, MessageCircle, Send, Trash2 } from 'lucide-react';
+import { fetchPost, fetchPosts, fetchComments, createComment, deleteComment, type Post, type Comment } from '@/lib/api';
+import { renderEditorData } from '@/components/shared/Editor';
 
-const allPosts = Array.from({ length: 12 }, (_, i) => ({
-  id: i + 1,
-  title: [
-    'Phiên bản 3.0 chính thức ra mắt',
-    'Giải đấu Vô Địch Mùa Xuân 2026',
-    'Nhân vật mới: Ultra Instinct',
-    'Sự kiện Tết Nguyên Đán',
-    'Cập nhật bản đồ Namek',
-    'Top 10 chiến binh mạnh nhất',
-    'Hướng dẫn tân thủ chi tiết',
-    'Bảo trì máy chủ 30/03',
-    'Skin mới: Golden Warrior',
-    'Chế độ PvP mới',
-    'Cập nhật cân bằng lực lượng',
-    'Sự kiện kỷ niệm 1 năm',
-  ][i],
-  date: `${28 - i}/03/2026`,
-  tag: ['Cập nhật', 'Giải đấu', 'Mới', 'Sự kiện', 'Cập nhật', 'Hướng dẫn', 'Hướng dẫn', 'Thông báo', 'Mới', 'Tính năng', 'Cập nhật', 'Sự kiện'][i],
-  readTime: `${3 + (i % 5)} phút đọc`,
-  cover: `https://images.unsplash.com/photo-${[
-    '1534996858221-380b92700493',
-    '1542751371-adc38448a05e',
-    '1511512578047-dfb367046420',
-    '1550745165-9bc0b252726f',
-    '1518709268805-4e9042af9f23',
-    '1560419015-7c427e8ae5ba',
-    '1542751110-97427bbecf20',
-    '1535016120-5e2be74746e6',
-    '1511882150382-421056c89033',
-    '1498736297812-3a08021f206f',
-    '1504384308090-c894fdcc538d',
-    '1519125323398-675f0ddb6308',
-  ][i]}?w=1200&h=600&fit=crop`,
-  content: `
-## Tổng quan
+const CATEGORY_LABELS: Record<number, string> = { 0: 'Tin tức', 1: 'Sự kiện', 2: 'Hướng dẫn', 3: 'Cập nhật', 4: 'Cộng đồng' };
 
-Chào mừng các chiến binh đến với bản cập nhật mới nhất! Đây là một trong những bản cập nhật lớn nhất từ trước đến nay, mang đến hàng loạt tính năng mới và cải tiến đáng kể.
+interface UserInfo {
+  id: number;
+  username: string;
+  is_admin: number;
+}
 
-### Những thay đổi chính
-
-Bản cập nhật này tập trung vào việc nâng cao trải nghiệm người chơi với nhiều cải tiến quan trọng. Chúng tôi đã lắng nghe phản hồi từ cộng đồng và thực hiện những điều chỉnh cần thiết.
-
-- **Hệ thống chiến đấu được cải tiến** với combo mới và hiệu ứng kỹ năng ấn tượng hơn
-- **Bản đồ mới** với địa hình đa dạng và nhiều khu vực khám phá
-- **Cân bằng nhân vật** dựa trên dữ liệu từ hàng triệu trận đấu
-- **Tối ưu hiệu năng** giúp game chạy mượt hơn trên mọi thiết bị
-
-### Chi tiết kỹ thuật
-
-Đội ngũ phát triển đã dành hơn 3 tháng để hoàn thiện bản cập nhật này. Mỗi tính năng đều được kiểm tra kỹ lưỡng trước khi ra mắt.
-
-> "Chúng tôi tin rằng bản cập nhật này sẽ mang đến trải nghiệm tốt nhất cho người chơi" — Đội ngũ phát triển
-
-### Lịch trình triển khai
-
-Bản cập nhật sẽ được triển khai theo giai đoạn để đảm bảo sự ổn định của hệ thống. Giai đoạn 1 bắt đầu từ ngày mai với các tính năng cốt lõi, tiếp theo là giai đoạn 2 với nội dung bổ sung trong tuần sau.
-
-Hãy theo dõi kênh thông báo chính thức để cập nhật thông tin mới nhất!
-  `.trim(),
-}));
+/** Try to parse description as Editor.js JSON, return HTML or null */
+function tryRenderEditorContent(description: string): string | null {
+  try {
+    const parsed = JSON.parse(description);
+    if (parsed && parsed.blocks && Array.isArray(parsed.blocks)) {
+      return renderEditorData(parsed);
+    }
+  } catch {
+    // Not JSON - plain text
+  }
+  return null;
+}
 
 export default function PostDetailPage() {
   const { id } = useParams();
-  const post = allPosts.find(p => p.id === Number(id));
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [commentText, setCommentText] = useState('');
 
-  if (!post) {
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try { setUser(JSON.parse(stored)); } catch { setUser(null); }
+    }
+  }, []);
+
+  const { data: post, isLoading, error } = useQuery({
+    queryKey: ['post', id],
+    queryFn: () => fetchPost(Number(id)),
+    enabled: !!id,
+  });
+
+  // Related posts (same category)
+  const { data: relatedData } = useQuery({
+    queryKey: ['related-posts', post?.category],
+    queryFn: () => fetchPosts({ category: post?.category, limit: 4 }),
+    enabled: !!post,
+  });
+
+  // Comments (only for community posts, category 4)
+  const isCommunity = post?.category === 4;
+  const { data: commentsData } = useQuery({
+    queryKey: ['comments', id],
+    queryFn: () => fetchComments(Number(id)),
+    enabled: !!id && isCommunity,
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: (content: string) => createComment(Number(id), {
+      user_id: user!.id,
+      username: user!.username,
+      content,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', id] });
+      setCommentText('');
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: number) => deleteComment(commentId, {
+      user_id: user!.id,
+      is_admin: user?.is_admin === 1,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', id] });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center text-muted-foreground">Đang tải...</div>
+      </div>
+    );
+  }
+
+  if (error || !post) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -80,67 +104,60 @@ export default function PostDetailPage() {
     );
   }
 
-  const related = allPosts.filter(p => p.id !== post.id && p.tag === post.tag).slice(0, 3);
-  if (related.length < 3) {
-    const extra = allPosts.filter(p => p.id !== post.id && !related.includes(p)).slice(0, 3 - related.length);
-    related.push(...extra);
-  }
+  const related = (relatedData?.data || []).filter((p: Post) => p.id !== post.id).slice(0, 3);
+  const tag = CATEGORY_LABELS[post.category] || 'Khác';
+  const comments = commentsData?.data || [];
 
-  const contentParagraphs = post.content.split('\n').filter(line => line.trim());
+  // Try to render as Editor.js content first, fallback to plain text
+  const editorHtml = tryRenderEditorContent(post.description);
+  const contentParagraphs = !editorHtml ? post.description.split('\n').filter((line: string) => line.trim()) : [];
+
+  const handleSubmitComment = () => {
+    if (!commentText.trim() || !user) return;
+    addCommentMutation.mutate(commentText);
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Cover */}
-      <div className="relative h-[50vh] min-h-[400px] w-full overflow-hidden md:h-[60vh]">
-        <motion.img
-          src={post.cover}
-          alt={post.title}
-          className="h-full w-full object-cover"
-          initial={{ scale: 1.1 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 1.2, ease: 'easeOut' }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-
-        {/* Back button */}
+      {/* Hero */}
+      <div className="relative bg-gradient-to-b from-primary/5 to-background px-6 pb-10 pt-24">
         <Link
-          to="/news"
+          to={isCommunity ? '/community' : '/news'}
           className="absolute left-6 top-24 z-20 flex items-center gap-2 rounded-full bg-card/80 px-4 py-2 text-sm font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-card"
         >
           <ArrowLeft size={16} />
           Quay lại
         </Link>
 
-        {/* Title overlay */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 px-6 pb-10">
-          <div className="container mx-auto max-w-4xl">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-            >
-              <span className="inline-block rounded-full bg-primary/90 px-4 py-1 text-xs font-semibold text-primary-foreground">
-                {post.tag}
+        <div className="container mx-auto max-w-4xl pt-8">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+          >
+            <span className="inline-block rounded-full bg-primary/90 px-4 py-1 text-xs font-semibold text-primary-foreground">
+              {tag}
+            </span>
+            <h1 className="mt-4 font-display text-3xl font-bold leading-tight text-foreground md:text-5xl">
+              {post.title}
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Calendar size={14} />
+                {new Date(post.created_at).toLocaleDateString('vi-VN')}
               </span>
-              <h1 className="mt-4 font-display text-3xl font-bold leading-tight text-foreground md:text-5xl">
-                {post.title}
-              </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Tag size={14} />
+                {tag}
+              </span>
+              {isCommunity && (
                 <span className="flex items-center gap-1.5">
-                  <Calendar size={14} />
-                  {post.date}
+                  <MessageCircle size={14} />
+                  {comments.length} bình luận
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <Clock size={14} />
-                  {post.readTime}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Tag size={14} />
-                  {post.tag}
-                </span>
-              </div>
-            </motion.div>
-          </div>
+              )}
+            </div>
+          </motion.div>
         </div>
       </div>
 
@@ -149,12 +166,12 @@ export default function PostDetailPage() {
         <AnimatedSection>
           <div className="flex items-center justify-between border-b border-border pb-6">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
-                NR
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold uppercase">
+                {(post.author_name || 'NR').slice(0, 2)}
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">Ngọc Rồng Team</p>
-                <p className="text-xs text-muted-foreground">Đội ngũ phát triển</p>
+                <p className="text-sm font-semibold text-foreground">{post.author_name || 'Ngọc Rồng Team'}</p>
+                <p className="text-xs text-muted-foreground">{new Date(post.created_at).toLocaleString('vi-VN')}</p>
               </div>
             </div>
             <button className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -165,37 +182,43 @@ export default function PostDetailPage() {
         </AnimatedSection>
 
         <AnimatedSection delay={0.1}>
-          <article className="prose prose-lg dark:prose-invert mt-10 max-w-none">
-            {contentParagraphs.map((line, i) => {
-              const trimmed = line.trim();
-              if (trimmed.startsWith('## ')) {
-                return <h2 key={i} className="mt-10 mb-4 font-display text-2xl font-bold text-foreground md:text-3xl">{trimmed.replace('## ', '')}</h2>;
-              }
-              if (trimmed.startsWith('### ')) {
-                return <h3 key={i} className="mt-8 mb-3 font-display text-xl font-semibold text-foreground">{trimmed.replace('### ', '')}</h3>;
-              }
-              if (trimmed.startsWith('> ')) {
-                return (
-                  <blockquote key={i} className="my-6 border-l-4 border-primary/50 bg-primary/5 py-4 pl-6 pr-4 italic text-muted-foreground rounded-r-xl">
-                    {trimmed.replace('> ', '')}
-                  </blockquote>
-                );
-              }
-              if (trimmed.startsWith('- **')) {
-                const match = trimmed.match(/^- \*\*(.+?)\*\*(.*)$/);
-                if (match) {
+          <article className="prose prose-lg dark:prose-invert mt-10 max-w-none prose-img:rounded-lg prose-img:mx-auto prose-headings:text-foreground prose-a:text-primary">
+            {editorHtml ? (
+              /* Editor.js content */
+              <div dangerouslySetInnerHTML={{ __html: editorHtml }} />
+            ) : (
+              /* Plain text fallback */
+              contentParagraphs.map((line: string, i: number) => {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('## ')) {
+                  return <h2 key={i} className="mt-10 mb-4 font-display text-2xl font-bold text-foreground md:text-3xl">{trimmed.replace('## ', '')}</h2>;
+                }
+                if (trimmed.startsWith('### ')) {
+                  return <h3 key={i} className="mt-8 mb-3 font-display text-xl font-semibold text-foreground">{trimmed.replace('### ', '')}</h3>;
+                }
+                if (trimmed.startsWith('> ')) {
                   return (
-                    <div key={i} className="my-2 flex items-start gap-3">
-                      <ChevronRight size={16} className="mt-1 shrink-0 text-primary" />
-                      <p className="text-foreground/80">
-                        <strong className="text-foreground">{match[1]}</strong>{match[2]}
-                      </p>
-                    </div>
+                    <blockquote key={i} className="my-6 border-l-4 border-primary/50 bg-primary/5 py-4 pl-6 pr-4 italic text-muted-foreground rounded-r-xl">
+                      {trimmed.replace('> ', '')}
+                    </blockquote>
                   );
                 }
-              }
-              return <p key={i} className="my-4 leading-relaxed text-foreground/80">{trimmed}</p>;
-            })}
+                if (trimmed.startsWith('- **')) {
+                  const match = trimmed.match(/^- \*\*(.+?)\*\*(.*)$/);
+                  if (match) {
+                    return (
+                      <div key={i} className="my-2 flex items-start gap-3">
+                        <ChevronRight size={16} className="mt-1 shrink-0 text-primary" />
+                        <p className="text-foreground/80">
+                          <strong className="text-foreground">{match[1]}</strong>{match[2]}
+                        </p>
+                      </div>
+                    );
+                  }
+                }
+                return <p key={i} className="my-4 leading-relaxed text-foreground/80">{trimmed}</p>;
+              })
+            )}
           </article>
         </AnimatedSection>
 
@@ -203,54 +226,151 @@ export default function PostDetailPage() {
         <AnimatedSection delay={0.2}>
           <div className="mt-12 flex flex-wrap items-center gap-2 border-t border-border pt-8">
             <span className="text-sm font-medium text-muted-foreground">Tags:</span>
-            {[post.tag, 'Ngọc Rồng', 'Game'].map(tag => (
-              <span key={tag} className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                {tag}
+            {[tag, 'Ngọc Rồng', 'Game'].map(t => (
+              <span key={t} className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                {t}
               </span>
             ))}
           </div>
         </AnimatedSection>
 
-        {/* Related Posts */}
-        <AnimatedSection delay={0.3}>
-          <div className="mt-16">
-            <h2 className="mb-8 font-display text-2xl font-bold text-foreground">Bài viết liên quan</h2>
-            <div className="grid gap-6 md:grid-cols-3">
-              {related.map((item, i) => (
-                <Link
-                  key={item.id}
-                  to={`/news/${item.id}`}
-                  className="group overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow"
-                >
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    viewport={{ once: true }}
-                  >
-                    <div className="relative h-40 overflow-hidden">
-                      <img
-                        src={item.cover}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+        {/* Comments Section — only for community posts (category 4) */}
+        {isCommunity && (
+          <AnimatedSection delay={0.25}>
+            <div className="mt-12 border-t border-border pt-8">
+              <h2 className="mb-6 flex items-center gap-2 font-display text-xl font-bold text-foreground">
+                <MessageCircle size={22} className="text-primary" />
+                Bình luận ({comments.length})
+              </h2>
+
+              {/* Comment Input */}
+              {user ? (
+                <div className="mb-8">
+                  <div className="flex gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary uppercase">
+                      {user.username.slice(0, 2)}
+                    </div>
+                    <div className="flex-1">
+                      <textarea
+                        value={commentText}
+                        onChange={e => setCommentText(e.target.value)}
+                        placeholder="Viết bình luận..."
+                        rows={3}
+                        className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none resize-none transition-colors"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSubmitComment();
+                          }
+                        }}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-card/60 to-transparent" />
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Nhấn Enter để gửi, Shift+Enter để xuống dòng</span>
+                        <button
+                          onClick={handleSubmitComment}
+                          disabled={!commentText.trim() || addCommentMutation.isPending}
+                          className="gradient-fire inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                        >
+                          <Send size={14} />
+                          {addCommentMutation.isPending ? 'Đang gửi...' : 'Gửi'}
+                        </button>
+                      </div>
                     </div>
-                    <div className="p-5">
-                      <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">
-                        {item.tag}
-                      </span>
-                      <h3 className="mt-2 font-display text-sm font-semibold text-foreground line-clamp-2 transition-colors group-hover:text-primary">
-                        {item.title}
-                      </h3>
-                      <p className="mt-2 text-xs text-muted-foreground">{item.date}</p>
-                    </div>
-                  </motion.div>
-                </Link>
-              ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-8 rounded-2xl border border-border bg-card/60 p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    <Link to="/auth" className="text-primary hover:underline font-medium">Đăng nhập</Link> để bình luận
+                  </p>
+                </div>
+              )}
+
+              {/* Comments List */}
+              {comments.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-card/40 py-10 text-center">
+                  <MessageCircle size={32} className="mx-auto mb-2 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">Chưa có bình luận nào. Hãy là người đầu tiên!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {comments.map((comment: Comment, i: number) => (
+                    <motion.div
+                      key={comment.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      className="group flex gap-3"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground uppercase">
+                        {comment.username.slice(0, 2)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground">{comment.username}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(comment.created_at).toLocaleString('vi-VN')}
+                              </span>
+                            </div>
+                            {user && (user.id === comment.user_id || user.is_admin === 1) && (
+                              <button
+                                onClick={() => { if (confirm('Xóa bình luận này?')) deleteCommentMutation.mutate(comment.id); }}
+                                className="rounded-lg p-1 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors hover:text-destructive"
+                                title="Xóa bình luận"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                          <p className="mt-1.5 text-sm text-foreground/80 whitespace-pre-wrap break-words">{comment.content}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        </AnimatedSection>
+          </AnimatedSection>
+        )}
+
+        {/* Related Posts */}
+        {related.length > 0 && (
+          <AnimatedSection delay={0.3}>
+            <div className="mt-16">
+              <h2 className="mb-8 font-display text-2xl font-bold text-foreground">Bài viết liên quan</h2>
+              <div className="grid gap-6 md:grid-cols-3">
+                {related.map((item: Post, i: number) => (
+                  <Link
+                    key={item.id}
+                    to={`/news/${item.id}`}
+                    className="group overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <div className="p-5">
+                        <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">
+                          {CATEGORY_LABELS[item.category] || 'Khác'}
+                        </span>
+                        <h3 className="mt-2 font-display text-sm font-semibold text-foreground line-clamp-2 transition-colors group-hover:text-primary">
+                          {item.title}
+                        </h3>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {new Date(item.created_at).toLocaleDateString('vi-VN')}
+                        </p>
+                      </div>
+                    </motion.div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </AnimatedSection>
+        )}
       </div>
     </div>
   );

@@ -15,6 +15,8 @@ import GiftcodePage from "@/pages/GiftcodePage";
 import CommunityPage from "@/pages/CommunityPage";
 import AuthPage from "@/pages/AuthPage";
 import AdminPage from "@/pages/AdminPage";
+import CreatePostPage from "@/pages/CreatePostPage";
+import MyPostsPage from "@/pages/MyPostsPage";
 import NotFound from "./pages/NotFound.tsx";
 import ScrollToTop from "./components/ScrollToTop";
 import BackToTop from "./components/shared/BackToTop";
@@ -37,6 +39,8 @@ const App = () => {
             <Route path="/auth" element={<AuthPage />} />
             {/* Admin page - own layout */}
             <Route path="/admin" element={<Layout isDark={isDark} onToggleTheme={toggle}><AdminPage /></Layout>} />
+            <Route path="/create-post" element={<Layout isDark={isDark} onToggleTheme={toggle}><CreatePostPage /></Layout>} />
+            <Route path="/my-posts" element={<Layout isDark={isDark} onToggleTheme={toggle}><MyPostsPage /></Layout>} />
             {/* Public pages with layout */}
             <Route path="/" element={<Layout isDark={isDark} onToggleTheme={toggle}><HomePage /></Layout>} />
             <Route path="/about" element={<Layout isDark={isDark} onToggleTheme={toggle}><AboutPage /></Layout>} />

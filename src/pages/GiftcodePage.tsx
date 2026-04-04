@@ -1,34 +1,49 @@
 import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
 import { Gift, Check, X, Copy } from 'lucide-react';
 import bgGiftcode from '@/assets/bg-giftcode.jpg';
-
-const publicCodes = [
-  { code: 'NGOCRONGVIP', reward: '500 Kim Cương + 10 Ngọc Rồng', status: 'active' },
-  { code: 'TANTHU2026', reward: '200 Kim Cương + Skin SR', status: 'active' },
-  { code: 'MUAXUAN', reward: '300 Kim Cương', status: 'expired' },
-];
+import { fetchGiftcodes, redeemGiftcode, type Giftcode } from '@/lib/api';
 
 export default function GiftcodePage() {
   const [code, setCode] = useState('');
   const [result, setResult] = useState<'success' | 'error' | null>(null);
+  const [resultMsg, setResultMsg] = useState('');
+
+  const { data } = useQuery({
+    queryKey: ['public-giftcodes'],
+    queryFn: () => fetchGiftcodes(),
+  });
+
+  const redeemMutation = useMutation({
+    mutationFn: (c: string) => redeemGiftcode(c),
+    onSuccess: (data) => {
+      setResult('success');
+      setResultMsg(data.message);
+      setTimeout(() => setResult(null), 3000);
+    },
+    onError: (err: Error) => {
+      setResult('error');
+      setResultMsg(err.message);
+      setTimeout(() => setResult(null), 3000);
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (publicCodes.some(c => c.code === code.toUpperCase().trim() && c.status === 'active')) {
-      setResult('success');
-    } else {
-      setResult('error');
-    }
-    setTimeout(() => setResult(null), 3000);
+    if (!code.trim()) return;
+    redeemMutation.mutate(code.trim());
   };
 
   const copyCode = (c: string) => {
     navigator.clipboard.writeText(c);
   };
+
+  const giftcodes = data?.data || [];
+  const isActive = (gc: Giftcode) => gc.count_left > 0 && new Date(gc.expired) > new Date();
 
   return (
     <PageBackground src={bgGiftcode}>
@@ -48,9 +63,10 @@ export default function GiftcodePage() {
             />
             <button
               type="submit"
-              className="mt-4 w-full rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02]"
+              disabled={redeemMutation.isPending}
+              className="mt-4 w-full rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] disabled:opacity-60"
             >
-              Đổi mã
+              {redeemMutation.isPending ? 'Đang xử lý...' : 'Đổi mã'}
             </button>
 
             <AnimatePresence>
@@ -66,7 +82,7 @@ export default function GiftcodePage() {
                   }`}
                 >
                   {result === 'success' ? <Check size={16} /> : <X size={16} />}
-                  {result === 'success' ? 'Đổi mã thành công! Kiểm tra hộp thư.' : 'Mã không hợp lệ hoặc đã hết hạn.'}
+                  {resultMsg}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -76,26 +92,33 @@ export default function GiftcodePage() {
         {/* Public Codes */}
         <AnimatedSection>
           <div className="mx-auto max-w-2xl">
-            <h3 className="mb-6 text-center font-display text-xl font-semibold text-foreground">Mã đang hoạt động</h3>
-            <div className="space-y-3">
-              {publicCodes.map(c => (
-                <div key={c.code} className={`flex items-center justify-between rounded-xl border border-border p-4 transition-colors ${c.status === 'expired' ? 'opacity-50' : 'bg-card hover:border-primary/30'}`}>
-                  <div>
-                    <p className="font-mono font-semibold text-foreground">{c.code}</p>
-                    <p className="text-sm text-muted-foreground">{c.reward}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {c.status === 'expired' ? (
-                      <span className="text-xs text-muted-foreground">Hết hạn</span>
-                    ) : (
-                      <button onClick={() => copyCode(c.code)} className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                        <Copy size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h3 className="mb-6 text-center font-display text-xl font-semibold text-foreground">Danh sách Giftcode</h3>
+            {giftcodes.length === 0 ? (
+              <p className="text-center text-muted-foreground">Chưa có giftcode nào.</p>
+            ) : (
+              <div className="space-y-3">
+                {giftcodes.map((c: Giftcode) => {
+                  const active = isActive(c);
+                  return (
+                    <div key={c.id} className={`flex items-center justify-between rounded-xl border border-border p-4 transition-colors ${!active ? 'opacity-50' : 'bg-card hover:border-primary/30'}`}>
+                      <div>
+                        <p className="font-mono font-semibold text-foreground">{c.code}</p>
+                        <p className="text-sm text-muted-foreground">Còn {c.count_left} lượt • Hết hạn: {new Date(c.expired).toLocaleDateString('vi-VN')}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!active ? (
+                          <span className="text-xs text-muted-foreground">Hết hạn</span>
+                        ) : (
+                          <button onClick={() => copyCode(c.code)} className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                            <Copy size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </AnimatedSection>
       </div>

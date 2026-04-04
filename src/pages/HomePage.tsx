@@ -1,24 +1,29 @@
 import { motion } from 'framer-motion';
 import { Download, Flame, Newspaper, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import heroCharacter from '@/assets/hero-character.jpg';
 import heroBgExtended from '@/assets/hero-bg-extended.jpg';
+import { fetchPosts, type Post } from '@/lib/api';
 
-const newsItems = [
-  { id: 1, title: 'Cập nhật phiên bản 3.0 — Sức mạnh mới', date: '28/03/2026', tag: 'Update' },
-  { id: 2, title: 'Giải đấu mùa xuân chính thức khởi tranh', date: '25/03/2026', tag: 'Tournament' },
-  { id: 3, title: 'Nhân vật mới: Siêu Chiến Binh Vũ Trụ', date: '20/03/2026', tag: 'New' },
-];
-
-const events = [
-  { id: 1, title: 'Lễ hội Ngọc Rồng', desc: 'Nhận x2 phần thưởng mỗi ngày', badge: 'HOT' },
-  { id: 2, title: 'Đua top Server', desc: 'Top 1 nhận vật phẩm huyền thoại', badge: 'NEW' },
-  { id: 3, title: 'Check-in 7 ngày', desc: 'Tích lũy phần thưởng cực khủng', badge: 'EVENT' },
-];
+const CATEGORY_LABELS: Record<number, string> = { 0: 'Tin tức', 1: 'Sự kiện', 2: 'Hướng dẫn', 3: 'Cập nhật', 4: 'Cộng đồng' };
 
 export default function HomePage() {
+  const { data: newsData } = useQuery({
+    queryKey: ['home-news'],
+    queryFn: () => fetchPosts({ limit: 3 }),
+  });
+
+  const { data: eventsData } = useQuery({
+    queryKey: ['home-events'],
+    queryFn: () => fetchPosts({ category: 1, limit: 3 }),
+  });
+
+  const latestPosts = newsData?.data || [];
+  const eventPosts = eventsData?.data || [];
+
   return (
     <div>
       {/* Hero Section */}
@@ -112,15 +117,15 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <SectionTitle title="Tin tức mới nhất" subtitle="Cập nhật liên tục từ thế giới Ngọc Rồng" />
           <div className="grid gap-6 md:grid-cols-3">
-            {newsItems.map((item, i) => (
+            {latestPosts.map((item: Post, i: number) => (
               <AnimatedSection key={item.id} delay={i * 0.1}>
-                <Link to="/news" className="group block rounded-2xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+                <Link to={`/news/${item.id}`} className="group block rounded-2xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
                   <div className="mb-3 flex items-center gap-2">
                     <Newspaper size={16} className="text-primary" />
-                    <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">{item.tag}</span>
+                    <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">{CATEGORY_LABELS[item.category] || 'Khác'}</span>
                   </div>
                   <h3 className="font-display text-lg font-semibold text-foreground transition-colors group-hover:text-primary">{item.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{item.date}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString('vi-VN')}</p>
                 </Link>
               </AnimatedSection>
             ))}
@@ -132,22 +137,35 @@ export default function HomePage() {
       <section className="border-t border-border bg-card/50 py-20">
         <div className="container mx-auto px-4">
           <SectionTitle title="Sự kiện nổi bật" subtitle="Tham gia ngay để nhận thưởng cực khủng" />
-          <div className="grid gap-6 md:grid-cols-3">
-            {events.map((event, i) => (
-              <AnimatedSection key={event.id} delay={i * 0.1}>
-                <div className="group rounded-2xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
-                  <div className="mb-3 flex items-center justify-between">
-                    <Flame size={20} className="text-accent" />
-                    <span className={`rounded-full px-3 py-0.5 text-xs font-bold ${
-                      event.badge === 'HOT' ? 'bg-accent/15 text-accent' : 'bg-primary/15 text-primary'
-                    }`}>{event.badge}</span>
-                  </div>
-                  <h3 className="font-display text-lg font-semibold text-foreground">{event.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{event.desc}</p>
-                </div>
-              </AnimatedSection>
-            ))}
-          </div>
+          {eventPosts.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">Chưa có sự kiện nào</div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-3">
+              {eventPosts.map((event: Post, i: number) => (
+                <AnimatedSection key={event.id} delay={i * 0.1}>
+                  <Link to={`/news/${event.id}`} className="group block rounded-2xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+                    <div className="mb-3 flex items-center justify-between">
+                      <Flame size={20} className="text-accent" />
+                      {event.badge && (
+                        <span className={`rounded-full px-3 py-0.5 text-xs font-bold ${
+                          event.badge === 'HOT' ? 'bg-accent/15 text-accent'
+                          : event.badge === 'NEW' ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-foreground'
+                        }`}>{event.badge}</span>
+                      )}
+                    </div>
+                    <h3 className="font-display text-lg font-semibold text-foreground transition-colors group-hover:text-primary">{event.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {event.event_end
+                        ? `Đến ${new Date(event.event_end).toLocaleDateString('vi-VN')}`
+                        : new Date(event.created_at).toLocaleDateString('vi-VN')
+                      }
+                    </p>
+                  </Link>
+                </AnimatedSection>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

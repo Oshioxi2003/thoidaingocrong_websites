@@ -1,48 +1,54 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import bgNews from '@/assets/bg-news.jpg';
+import { fetchPosts, type Post } from '@/lib/api';
 
-const allNews = Array.from({ length: 12 }, (_, i) => ({
-  id: i + 1,
-  title: [
-    'Phiên bản 3.0 chính thức ra mắt',
-    'Giải đấu Vô Địch Mùa Xuân 2026',
-    'Nhân vật mới: Ultra Instinct',
-    'Sự kiện Tết Nguyên Đán',
-    'Cập nhật bản đồ Namek',
-    'Top 10 chiến binh mạnh nhất',
-    'Hướng dẫn tân thủ chi tiết',
-    'Bảo trì máy chủ 30/03',
-    'Skin mới: Golden Warrior',
-    'Chế độ PvP mới',
-    'Cập nhật cân bằng lực lượng',
-    'Sự kiện kỷ niệm 1 năm',
-  ][i],
-  date: `${28 - i}/03/2026`,
-  tag: ['Cập nhật', 'Giải đấu', 'Mới', 'Sự kiện', 'Cập nhật', 'Hướng dẫn', 'Hướng dẫn', 'Thông báo', 'Mới', 'Tính năng', 'Cập nhật', 'Sự kiện'][i],
-  excerpt: 'Khám phá những thay đổi mới nhất trong thế giới Ngọc Rồng với những tính năng đột phá...',
-}));
-
-const TAGS = ['Tất cả', 'Cập nhật', 'Giải đấu', 'Mới', 'Sự kiện', 'Hướng dẫn', 'Thông báo', 'Tính năng'];
+const CATEGORY_LABELS: Record<number, string> = { 0: 'Tin tức', 1: 'Sự kiện', 2: 'Hướng dẫn', 3: 'Cập nhật', 4: 'Cộng đồng' };
+const TAGS = ['Tất cả', 'Tin tức', 'Sự kiện', 'Hướng dẫn', 'Cập nhật'];
+const TAG_TO_CATEGORY: Record<string, string> = { 'Tin tức': '0', 'Sự kiện': '1', 'Hướng dẫn': '2', 'Cập nhật': '3' };
 const PER_PAGE = 6;
+
+/** Extract plain text preview from Editor.js JSON or return plain text */
+function tryGetPreview(description: string): string {
+  try {
+    const parsed = JSON.parse(description);
+    if (parsed?.blocks) {
+      const texts = parsed.blocks
+        .filter((b: any) => b.type === 'paragraph' || b.type === 'header')
+        .map((b: any) => b.data?.text?.replace(/<[^>]*>/g, '') || '')
+        .join(' ');
+      return texts.substring(0, 150) || '';
+    }
+  } catch {
+    // plain text
+  }
+  return description.substring(0, 150);
+}
 
 export default function NewsPage() {
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState('Tất cả');
   const [page, setPage] = useState(1);
 
-  const filtered = allNews.filter(n => {
-    const matchSearch = n.title.toLowerCase().includes(search.toLowerCase());
-    const matchTag = activeTag === 'Tất cả' || n.tag === activeTag;
-    return matchSearch && matchTag;
+  const categoryParam = activeTag === 'Tất cả' ? undefined : TAG_TO_CATEGORY[activeTag];
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['news', search, categoryParam, page],
+    queryFn: () => fetchPosts({
+      search: search || undefined,
+      category: categoryParam,
+      page,
+      limit: PER_PAGE,
+    }),
   });
 
-  const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const posts = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
   return (
     <PageBackground src={bgNews}>
@@ -78,39 +84,56 @@ export default function NewsPage() {
           </div>
         </AnimatedSection>
 
-        {/* News Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {paged.map((item, i) => (
-            <AnimatedSection key={item.id} delay={i * 0.05}>
-              <Link to={`/news/${item.id}`} className="group block rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
-                <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">{item.tag}</span>
-                <h3 className="mt-3 font-display text-lg font-semibold text-foreground transition-colors group-hover:text-primary">{item.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{item.excerpt}</p>
-                <p className="mt-3 text-xs text-muted-foreground">{item.date}</p>
-              </Link>
-            </AnimatedSection>
-          ))}
-        </div>
+        {/* Loading */}
+        {isLoading ? (
+          <div className="py-20 text-center text-muted-foreground">Đang tải...</div>
+        ) : posts.length === 0 ? (
+          <div className="py-20 text-center text-muted-foreground">Chưa có bài viết nào.</div>
+        ) : (
+          <>
+            {/* News Grid */}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {posts.map((item: Post, i: number) => (
+                <AnimatedSection key={item.id} delay={i * 0.05}>
+                  <Link to={`/news/${item.id}`} className="group block rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+                    <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">
+                      {CATEGORY_LABELS[item.category] || 'Khác'}
+                    </span>
+                    <h3 className="mt-3 font-display text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                      {tryGetPreview(item.description)}
+                    </p>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {new Date(item.created_at).toLocaleDateString('vi-VN')}
+                    </p>
+                  </Link>
+                </AnimatedSection>
+              ))}
+            </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-10 flex items-center justify-center gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30">
-              <ChevronLeft size={18} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i}
-                onClick={() => setPage(i + 1)}
-                className={`h-9 w-9 rounded-lg text-sm font-medium transition-colors ${
-                  page === i + 1 ? 'gradient-fire text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
-                }`}
-              >{i + 1}</button>
-            ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30">
-              <ChevronRight size={18} />
-            </button>
-          </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex items-center justify-center gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30">
+                  <ChevronLeft size={18} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPage(i + 1)}
+                    className={`h-9 w-9 rounded-lg text-sm font-medium transition-colors ${
+                      page === i + 1 ? 'gradient-fire text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >{i + 1}</button>
+                ))}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30">
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

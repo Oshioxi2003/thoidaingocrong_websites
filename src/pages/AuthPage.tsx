@@ -9,15 +9,19 @@ type AuthMode = 'login' | 'register' | 'forgot';
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ name: '', email: '', identifier: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!form.email.trim()) errs.email = 'Email không được để trống';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ';
+    if (mode === 'login') {
+      if (!form.identifier.trim()) errs.identifier = 'Vui lòng nhập email hoặc tên tài khoản';
+    } else {
+      if (!form.email.trim()) errs.email = 'Email không được để trống';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ';
+    }
 
     if (mode !== 'forgot') {
       if (!form.password) errs.password = 'Mật khẩu không được để trống';
@@ -37,15 +41,45 @@ export default function AuthPage() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    // Mock auth - navigate to dashboard
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    if (mode === 'forgot') {
-      setErrors({});
-      setMode('login');
-      return;
+    setErrors({});
+
+    try {
+      if (mode === 'forgot') {
+        // Forgot password - chưa implement backend
+        await new Promise(r => setTimeout(r, 1000));
+        setMode('login');
+        setLoading(false);
+        return;
+      }
+
+      const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
+      const body = mode === 'register'
+        ? { username: form.name, email: form.email, password: form.password }
+        : { identifier: form.identifier, password: form.password };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrors({ server: data.error || 'Đã xảy ra lỗi' });
+        setLoading(false);
+        return;
+      }
+
+      // Lưu user info vào localStorage
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      setLoading(false);
+      navigate('/');
+    } catch (err) {
+      setErrors({ server: 'Không thể kết nối tới server' });
+      setLoading(false);
     }
-    navigate('/admin');
   };
 
   const titles = {
@@ -89,6 +123,16 @@ export default function AuthPage() {
               <p className="mb-8 text-center text-sm text-muted-foreground">{subtitles[mode]}</p>
 
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Server error */}
+                {errors.server && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive"
+                  >
+                    {errors.server}
+                  </motion.div>
+                )}
                 {/* Name field (register only) */}
                 {mode === 'register' && (
                   <InputField
@@ -100,15 +144,26 @@ export default function AuthPage() {
                   />
                 )}
 
-                {/* Email */}
-                <InputField
-                  icon={<Mail size={18} />}
-                  type="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={v => setForm(f => ({ ...f, email: v }))}
-                  error={errors.email}
-                />
+                {/* Email / Identifier */}
+                {mode === 'login' ? (
+                  <InputField
+                    icon={<User size={18} />}
+                    type="text"
+                    placeholder="Email hoặc tên tài khoản"
+                    value={form.identifier}
+                    onChange={v => setForm(f => ({ ...f, identifier: v }))}
+                    error={errors.identifier}
+                  />
+                ) : (
+                  <InputField
+                    icon={<Mail size={18} />}
+                    type="email"
+                    placeholder="Email"
+                    value={form.email}
+                    onChange={v => setForm(f => ({ ...f, email: v }))}
+                    error={errors.email}
+                  />
+                )}
 
                 {/* Password */}
                 {mode !== 'forgot' && (
