@@ -25,7 +25,6 @@ export default function AuthPage() {
 
     if (mode !== 'forgot') {
       if (!form.password) errs.password = 'Mật khẩu không được để trống';
-      else if (form.password.length < 6) errs.password = 'Mật khẩu tối thiểu 6 ký tự';
     }
 
     if (mode === 'register') {

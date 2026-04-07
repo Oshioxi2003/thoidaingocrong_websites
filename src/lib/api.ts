@@ -212,3 +212,50 @@ export async function deleteGiftcode(id: number): Promise<{ message: string }> {
 export async function fetchStats(): Promise<{ totalPosts: number; totalUsers: number; totalGiftcodes: number }> {
   return request('/stats');
 }
+
+// ============ Deposit API ============
+
+export interface DepositOrder {
+  id: number;
+  name: number;
+  refNo: string;
+  amount: number;
+  status: number;
+  bank: string;
+  date: string;
+  transfer_code: string;
+  user_id: number;
+  username: string;
+  created_at: string;
+}
+
+export interface DepositCreateResponse {
+  message: string;
+  deposit: DepositOrder;
+  bank: { bank: string; accountName: string; accountNumber: string };
+}
+
+export interface DepositCheckResponse {
+  status: 'success' | 'pending';
+  message: string;
+  cash_added?: number;
+  user?: { id: number; username: string; email: string; is_admin: number; cash: number; vang: number; vip: number };
+}
+
+export async function createDeposit(data: { user_id: number; username: string; amount: number }): Promise<DepositCreateResponse> {
+  return request<DepositCreateResponse>('/deposit/create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function checkDeposit(deposit_id: number): Promise<DepositCheckResponse> {
+  return request<DepositCheckResponse>('/deposit/check', {
+    method: 'POST',
+    body: JSON.stringify({ deposit_id }),
+  });
+}
+
+export async function fetchDepositHistory(userId: number, page = 1): Promise<PaginatedResponse<DepositOrder>> {
+  return request<PaginatedResponse<DepositOrder>>(`/deposit/history?user_id=${userId}&page=${page}`);
+}

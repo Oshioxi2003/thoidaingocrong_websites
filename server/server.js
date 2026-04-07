@@ -148,6 +148,17 @@ app.post('/api/upload/image-url', async (req, res) => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_post_id (post_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    // Thêm cột transfer_code, user_id, username vào bảng payments cho nạp ATM
+    const [payTcCols] = await pool.query("SHOW COLUMNS FROM payments LIKE 'transfer_code'");
+    if (payTcCols.length === 0) {
+      await pool.query(`ALTER TABLE payments
+        ADD COLUMN transfer_code VARCHAR(50) DEFAULT NULL,
+        ADD COLUMN user_id INT DEFAULT NULL,
+        ADD COLUMN username VARCHAR(64) DEFAULT NULL,
+        ADD INDEX idx_transfer_code (transfer_code)`);
+      console.log('✅ Added transfer_code, user_id, username columns to payments table');
+    }
   } catch (err) {
     console.error('Auto-migrate error:', err.message);
   }
@@ -579,10 +590,6 @@ app.post('/api/auth/register', async (req, res) => {
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin' });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
-    }
-
     // Kiểm tra username đã tồn tại
     const [existUser] = await pool.query('SELECT id FROM account WHERE username = ?', [username]);
     if (existUser.length > 0) {
@@ -659,6 +666,152 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (err) {
     console.error('POST /api/auth/login error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ======================== DEPOSIT (NẠP ATM) ========================
+
+const BANK_CONFIG = {
+  bank: process.env.BANK_NAME || 'ACB',
+  accountName: process.env.BANK_ACCOUNT_NAME || 'DINH THI NGOC BICH',
+  accountNumber: process.env.BANK_ACCOUNT_NUMBER || '48932127',
+  token: process.env.BANK_API_TOKEN || '17e95e99df5f536a692653ab4c679237',
+};
+
+// POST /api/deposit/create — Tạo đơn nạp mới
+app.post('/api/deposit/create', async (req, res) => {
+  try {
+    const { user_id, username, amount } = req.body;
+    if (!user_id || !username || !amount) {
+      return res.status(400).json({ error: 'Thiếu thông tin' });
+    }
+    if (Number(amount) < 10000) {
+      return res.status(400).json({ error: 'Số tiền nạp tối thiểu 10,000 VND' });
+    }
+
+    // Tạo nội dung chuyển khoản: username + chuyentien
+    const transfer_code = `${username} chuyentien`;
+
+    // Xóa các record cũ bị kẹt (refNo rỗng hoặc format NAP cũ)
+    await pool.query("DELETE FROM payments WHERE status = 0 AND (refNo = '' OR transfer_code LIKE 'NAP%')");
+
+    // Check if there's already a pending order for this user with same amount
+    const [existing] = await pool.query(
+      "SELECT * FROM payments WHERE user_id = ? AND amount = ? AND status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)",
+      [user_id, Number(amount)]
+    );
+    if (existing.length > 0) {
+      return res.json({
+        message: 'Đã có đơn nạp đang chờ',
+        deposit: existing[0],
+        bank: { bank: BANK_CONFIG.bank, accountName: BANK_CONFIG.accountName, accountNumber: BANK_CONFIG.accountNumber },
+      });
+    }
+
+    const uniqueRef = `${transfer_code}_${Date.now()}`;
+    const [result] = await pool.query(
+      "INSERT INTO payments (name, refNo, amount, status, bank, date, transfer_code, user_id, username) VALUES (?, ?, ?, 0, ?, NOW(), ?, ?, ?)",
+      [user_id, uniqueRef, Number(amount), BANK_CONFIG.bank, transfer_code, user_id, username]
+    );
+
+    const [newDeposit] = await pool.query('SELECT * FROM payments WHERE id = ?', [result.insertId]);
+    res.status(201).json({
+      message: 'Đã tạo đơn nạp',
+      deposit: newDeposit[0],
+      bank: { bank: BANK_CONFIG.bank, accountName: BANK_CONFIG.accountName, accountNumber: BANK_CONFIG.accountNumber },
+    });
+  } catch (err) {
+    console.error('POST /api/deposit/create error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// POST /api/deposit/check — Kiểm tra thanh toán qua API sieuthicode
+app.post('/api/deposit/check', async (req, res) => {
+  try {
+    const { deposit_id } = req.body;
+    if (!deposit_id) {
+      return res.status(400).json({ error: 'Thiếu deposit_id' });
+    }
+
+    // Lấy đơn nạp
+    const [deposits] = await pool.query('SELECT * FROM payments WHERE id = ? AND transfer_code IS NOT NULL', [deposit_id]);
+    if (deposits.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy đơn nạp' });
+    }
+    const deposit = deposits[0];
+    if (deposit.status === 1) {
+      return res.json({ status: 'success', message: 'Đơn nạp đã được xử lý trước đó' });
+    }
+
+    // Gọi API sieuthicode.net v1
+    const apiUrl = `https://api.sieuthicode.net/v1/banking/bank/${BANK_CONFIG.bank.toLowerCase()}/${BANK_CONFIG.accountNumber}/${BANK_CONFIG.token}`;
+    const apiRes = await fetch(apiUrl);
+    const apiData = await apiRes.json();
+
+    if (!apiData || !apiData.data || !Array.isArray(apiData.data)) {
+      return res.json({ status: 'pending', message: 'Chưa tìm thấy giao dịch, vui lòng thử lại' });
+    }
+
+    // Tìm giao dịch khớp transfer_code và amount
+    const matched = apiData.data.find(tx => {
+      const content = (tx.description || tx.content || tx.memo || '').toUpperCase();
+      const txAmount = Number(tx.amount || tx.money || 0);
+      return content.includes(deposit.transfer_code.toUpperCase()) && txAmount >= deposit.amount;
+    });
+
+    if (!matched) {
+      return res.json({ status: 'pending', message: 'Chưa tìm thấy giao dịch, vui lòng thử lại sau' });
+    }
+
+    // Cập nhật đơn nạp thành công
+    const refNo = matched.refNo || matched.transactionNumber || matched.id || '';
+    await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
+
+    // Cộng cash cho user (1 VND = 1 cash)
+    const cashToAdd = deposit.amount;
+    await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ? WHERE id = ?', [cashToAdd, cashToAdd, deposit.user_id]);
+
+    // Lấy thông tin user mới nhất
+    const [updatedUser] = await pool.query('SELECT id, username, email, is_admin, cash, vang, vip FROM account WHERE id = ?', [deposit.user_id]);
+
+    res.json({
+      status: 'success',
+      message: `Nạp thành công ${cashToAdd.toLocaleString()} cash!`,
+      cash_added: cashToAdd,
+      user: updatedUser[0] || null,
+    });
+  } catch (err) {
+    console.error('POST /api/deposit/check error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/deposit/history — Lịch sử nạp
+app.get('/api/deposit/history', async (req, res) => {
+  try {
+    const { user_id, page = 1, limit = 20 } = req.query;
+    if (!user_id) {
+      return res.status(400).json({ error: 'Thiếu user_id' });
+    }
+
+    let sql = 'SELECT * FROM payments WHERE user_id = ? AND transfer_code IS NOT NULL';
+    const params = [Number(user_id)];
+    sql += ' ORDER BY created_at DESC';
+
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
+    const [countRows] = await pool.query(countSql, params);
+    const total = countRows[0].total;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(Number(limit), offset);
+
+    const [rows] = await pool.query(sql, params);
+    res.json({ data: rows, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    console.error('GET /api/deposit/history error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Moon, Sun, User, LogOut, ChevronDown, FileText } from 'lucide-react';
+import { Menu, X, Moon, Sun, User, LogOut, ChevronDown, FileText, Wallet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from '@/assets/logo.png';
 
@@ -143,6 +143,14 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                         <FileText size={16} className="text-muted-foreground" />
                         Bài viết của tôi
                       </Link>
+                      <Link
+                        to="/deposit"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
+                      >
+                        <Wallet size={16} className="text-muted-foreground" />
+                        Nạp tiền
+                      </Link>
                       {user.is_admin === 1 && (
                         <Link
                           to="/admin"
@@ -228,6 +236,14 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                       </div>
                     </div>
                   </div>
+                  <Link
+                    to="/deposit"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    <Wallet size={16} className="text-muted-foreground" />
+                    Nạp tiền
+                  </Link>
                   <button
                     onClick={() => { handleLogout(); setMobileOpen(false); }}
                     className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
