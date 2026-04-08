@@ -37,7 +37,7 @@ app.use('/download', express.static(downloadDir, {
 if (process.env.NODE_ENV === 'production') {
   const distDir = join(__dirname, '..', 'dist');
   app.use(express.static(distDir));
-  app.get('*', (req, res) => {
+  app.get('{*path}', (req, res) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/download')) {
       res.sendFile(join(distDir, 'index.html'));
     }
