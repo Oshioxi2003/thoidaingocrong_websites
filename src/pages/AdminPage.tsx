@@ -10,8 +10,8 @@ import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
   fetchUsers, banUser,
   fetchGiftcodes, createGiftcode, deleteGiftcode,
-  fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchIconList,
-  type Post, type User, type Giftcode, type Player, type InventoryItem
+  fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
+  type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate
 } from '@/lib/api';
 
 /* ============ SHARED PAGINATION ============ */
@@ -892,13 +892,13 @@ function InventoryTab() {
                         ? 'border-border/80 bg-gradient-to-br from-muted/80 to-muted/30 hover:border-primary/50 hover:shadow-md cursor-pointer'
                         : 'border-dashed border-border/40 bg-muted/10'
                     }`}
-                    title={item ? `ID: ${item.item_id} | SL: ${item.quantity} | Slot: ${item.slot}` : `Slot ${i}`}
+                    title={item ? `${item.name} (ID: ${item.item_id}) | SL: ${item.quantity} | Slot: ${item.slot}` : `Slot ${i}`}
                   >
                     {item && (
                       <>
                         <img
-                          src={`/media/icon/${item.item_id}.png`}
-                          alt={`Item ${item.item_id}`}
+                          src={`/media/icon/${item.icon_id}.png`}
+                          alt={item.name}
                           className="h-8 w-8 object-contain drop-shadow-sm"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
@@ -911,7 +911,7 @@ function InventoryTab() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Xóa vật phẩm ID ${item.item_id} (slot ${item.slot})?`))
+                            if (confirm(`Xóa vật phẩm "${item.name}" (ID: ${item.item_id}, slot ${item.slot})?`))
                               deleteMutation.mutate({ playerId: selectedPlayer!.id, slot: item.slot });
                           }}
                           className="absolute -right-1 -top-1 hidden rounded-full bg-destructive p-0.5 text-white shadow-md transition-transform hover:scale-110 group-hover:block"
@@ -933,6 +933,7 @@ function InventoryTab() {
                       <tr className="border-b border-border bg-muted/50">
                         <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Slot</th>
                         <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Icon</th>
+                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Tên vật phẩm</th>
                         <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Item ID</th>
                         <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Số lượng</th>
                         <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Options</th>
@@ -945,19 +946,20 @@ function InventoryTab() {
                           <td className="px-3 py-2 text-muted-foreground">{item.slot}</td>
                           <td className="px-3 py-2">
                             <img
-                              src={`/media/icon/${item.item_id}.png`}
+                              src={`/media/icon/${item.icon_id}.png`}
                               alt=""
                               className="h-6 w-6 object-contain"
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                           </td>
+                          <td className="px-3 py-2 text-foreground max-w-[150px] truncate" title={item.name}>{item.name}</td>
                           <td className="px-3 py-2 font-mono text-foreground">{item.item_id}</td>
                           <td className="px-3 py-2 text-foreground">{item.quantity.toLocaleString()}</td>
                           <td className="px-3 py-2 max-w-[200px] truncate font-mono text-muted-foreground" title={item.options}>{item.options}</td>
                           <td className="px-3 py-2 text-right">
                             <button
                               onClick={() => {
-                                if (confirm(`Xóa vật phẩm ID ${item.item_id}?`))
+                                if (confirm(`Xóa "${item.name}" (ID: ${item.item_id})?`))
                                   deleteMutation.mutate({ playerId: selectedPlayer!.id, slot: item.slot });
                               }}
                               className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -1004,13 +1006,14 @@ function AddItemModal({ playerId, playerName, onClose, onSuccess }: {
   const [options, setOptions] = useState('[]');
   const [iconSearch, setIconSearch] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [itemPickerPage, setItemPickerPage] = useState(1);
   const iconGridRef = useRef<HTMLDivElement>(null);
 
-  // Fetch icon list
-  const { data: iconData } = useQuery({
-    queryKey: ['icon-list'],
-    queryFn: fetchIconList,
-    staleTime: Infinity,
+  // Fetch item templates from database
+  const { data: itemTemplateData } = useQuery({
+    queryKey: ['item-templates', iconSearch, itemPickerPage],
+    queryFn: () => fetchItemTemplates({ search: iconSearch || undefined, page: itemPickerPage, limit: 100 }),
+    staleTime: 60000,
   });
 
   const addMutation = useMutation({
@@ -1022,15 +1025,15 @@ function AddItemModal({ playerId, playerName, onClose, onSuccess }: {
     onSuccess,
   });
 
-  const allIcons = iconData?.data || [];
-  const filteredIcons = useMemo(() => {
-    if (!iconSearch) return allIcons.slice(0, 200); // show first 200 by default
-    const searchNum = parseInt(iconSearch, 10);
-    if (!isNaN(searchNum)) {
-      return allIcons.filter(id => String(id).includes(iconSearch)).slice(0, 200);
-    }
-    return allIcons.slice(0, 200);
-  }, [allIcons, iconSearch]);
+  const itemTemplates = itemTemplateData?.data || [];
+  const totalTemplates = itemTemplateData?.total || 0;
+  const totalTemplatePages = itemTemplateData?.totalPages || 1;
+
+  // Find selected item template info for preview
+  const selectedTemplate = useMemo(() => {
+    if (!itemId) return null;
+    return itemTemplates.find(t => t.id === Number(itemId)) || null;
+  }, [itemTemplates, itemId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -1067,23 +1070,26 @@ function AddItemModal({ playerId, playerName, onClose, onSuccess }: {
                   className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   type="button"
                 >
-                  {showIconPicker ? 'Đóng' : 'Chọn icon'}
+                  {showIconPicker ? 'Đóng' : 'Chọn item'}
                 </button>
               </div>
             </div>
             {itemId && (
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/5">
+              <div className="flex h-12 items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3">
                 <img
-                  src={`/media/icon/${itemId}.png`}
-                  alt={`Item ${itemId}`}
+                  src={`/media/icon/${selectedTemplate?.icon_id ?? itemId}.png`}
+                  alt=""
                   className="h-8 w-8 object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
+                {selectedTemplate && (
+                  <span className="text-xs text-foreground max-w-[120px] truncate">{selectedTemplate.name}</span>
+                )}
               </div>
             )}
           </div>
 
-          {/* Icon Picker Grid */}
+          {/* Item Picker Grid */}
           <AnimatePresence>
             {showIconPicker && (
               <motion.div
@@ -1097,36 +1103,52 @@ function AddItemModal({ playerId, playerName, onClose, onSuccess }: {
                     <Search size={14} className="text-muted-foreground" />
                     <input
                       value={iconSearch}
-                      onChange={e => setIconSearch(e.target.value)}
-                      placeholder="Tìm theo ID..."
+                      onChange={e => { setIconSearch(e.target.value); setItemPickerPage(1); }}
+                      placeholder="Tìm theo tên hoặc ID..."
                       className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
                     />
-                    <span className="text-[10px] text-muted-foreground">{filteredIcons.length} / {allIcons.length}</span>
+                    <span className="text-[10px] text-muted-foreground">{itemTemplates.length} / {totalTemplates}</span>
                   </div>
-                  <div ref={iconGridRef} className="grid grid-cols-10 gap-1 max-h-[200px] overflow-y-auto sm:grid-cols-12 md:grid-cols-14">
-                    {filteredIcons.map(id => (
+                  <div ref={iconGridRef} className="grid grid-cols-8 gap-1 max-h-[240px] overflow-y-auto sm:grid-cols-10 md:grid-cols-12">
+                    {itemTemplates.map((t: ItemTemplate) => (
                       <button
-                        key={id}
-                        onClick={() => { setItemId(String(id)); setShowIconPicker(false); }}
-                        className={`flex aspect-square items-center justify-center rounded-md border text-[9px] transition-all hover:border-primary hover:bg-primary/10 ${
-                          String(id) === itemId ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border/30 bg-background/50'
+                        key={t.id}
+                        onClick={() => { setItemId(String(t.id)); setShowIconPicker(false); }}
+                        className={`flex flex-col items-center justify-center rounded-md border p-1 text-[8px] transition-all hover:border-primary hover:bg-primary/10 ${
+                          String(t.id) === itemId ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border/30 bg-background/50'
                         }`}
-                        title={`ID: ${id}`}
+                        title={`${t.name} (ID: ${t.id}, Icon: ${t.icon_id})`}
                       >
                         <img
-                          src={`/media/icon/${id}.png`}
-                          alt={`${id}`}
+                          src={`/media/icon/${t.icon_id}.png`}
+                          alt={t.name}
                           className="h-6 w-6 object-contain"
                           loading="lazy"
                           onError={(e) => {
                             const el = e.target as HTMLImageElement;
                             el.style.display = 'none';
-                            el.parentElement!.textContent = String(id);
                           }}
                         />
+                        <span className="mt-0.5 text-muted-foreground truncate w-full text-center leading-tight">{t.id}</span>
                       </button>
                     ))}
                   </div>
+                  {/* Pagination for item picker */}
+                  {totalTemplatePages > 1 && (
+                    <div className="mt-2 flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => setItemPickerPage(p => Math.max(1, p - 1))}
+                        disabled={itemPickerPage <= 1}
+                        className="rounded px-2 py-0.5 text-[10px] border border-border hover:bg-muted disabled:opacity-30"
+                      >←</button>
+                      <span className="text-[10px] text-muted-foreground">{itemPickerPage}/{totalTemplatePages}</span>
+                      <button
+                        onClick={() => setItemPickerPage(p => Math.min(totalTemplatePages, p + 1))}
+                        disabled={itemPickerPage >= totalTemplatePages}
+                        className="rounded px-2 py-0.5 text-[10px] border border-border hover:bg-muted disabled:opacity-30"
+                      >→</button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

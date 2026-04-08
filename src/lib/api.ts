@@ -270,12 +270,22 @@ export interface Player {
 }
 
 export interface InventoryItem {
-  id: number;
-  player_id: number;
   item_id: number;
   quantity: number;
   slot: number;
   options: string;
+  icon_id: number;
+  name: string;
+}
+
+export interface ItemTemplate {
+  id: number;
+  name: string;
+  icon_id: number;
+  type: number;
+  gender: number;
+  level: number;
+  description: string;
 }
 
 export async function fetchPlayers(params?: {
@@ -311,6 +321,14 @@ export async function deleteInventoryItem(playerId: number, slot: number): Promi
   });
 }
 
-export async function fetchIconList(): Promise<{ data: number[] }> {
-  return request<{ data: number[] }>('/admin/icon-list');
+export async function fetchItemTemplates(params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<ItemTemplate>> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.limit) q.set('limit', String(params.limit));
+  return request<PaginatedResponse<ItemTemplate>>(`/admin/item-templates?${q.toString()}`);
 }

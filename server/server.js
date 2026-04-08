@@ -865,10 +865,31 @@ app.get('/api/deposit/history', async (req, res) => {
 
 // ======================== ADMIN — PLAYER INVENTORY ========================
 
-// Helper: parse NRO items_bag JSON format
+// Cache item_template data for icon_id + name lookup
+let itemTemplateCache = null;
+let itemTemplateCacheTime = 0;
+const ITEM_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getItemTemplateMap() {
+  const now = Date.now();
+  if (itemTemplateCache && (now - itemTemplateCacheTime) < ITEM_CACHE_TTL) {
+    return itemTemplateCache;
+  }
+  const [rows] = await pool.query('SELECT id, NAME as name, icon_id, TYPE as type, gender, level, description FROM item_template');
+  const map = {};
+  for (const row of rows) {
+    map[row.id] = row;
+  }
+  itemTemplateCache = map;
+  itemTemplateCacheTime = now;
+  return map;
+}
+
+// Helper: parse NRO items_bag JSON format and enrich with icon_id + name from item_template
 // Each item is a string: "[item_id, quantity, \"[options]\", timestamp]"
-function parseNROItems(itemsBagJson) {
+async function parseNROItems(itemsBagJson) {
   const result = [];
+  const templateMap = await getItemTemplateMap();
   try {
     const rawItems = JSON.parse(itemsBagJson || '[]');
     for (let i = 0; i < rawItems.length; i++) {
@@ -876,11 +897,14 @@ function parseNROItems(itemsBagJson) {
         const parsed = JSON.parse(rawItems[i]);
         const itemId = parsed[0];
         if (itemId === -1) continue; // skip empty slots
+        const template = templateMap[itemId] || {};
         result.push({
           slot: i,
           item_id: itemId,
           quantity: parsed[1] || 0,
           options: typeof parsed[2] === 'string' ? parsed[2] : JSON.stringify(parsed[2] || '[]'),
+          icon_id: template.icon_id ?? itemId,
+          name: template.name || `Item #${itemId}`,
         });
       } catch { continue; }
     }
@@ -930,7 +954,7 @@ app.get('/api/admin/players/:id/inventory', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy nhân vật' });
     }
 
-    const items = parseNROItems(rows[0].items_bag);
+    const items = await parseNROItems(rows[0].items_bag);
     res.json({ data: items });
   } catch (err) {
     console.error('GET /api/admin/players/:id/inventory error:', err);
@@ -979,7 +1003,7 @@ app.post('/api/admin/players/:id/inventory', async (req, res) => {
     // Cập nhật DB
     await pool.query('UPDATE player SET items_bag = ? WHERE id = ?', [JSON.stringify(rawItems), playerId]);
 
-    const items = parseNROItems(JSON.stringify(rawItems));
+    const items = await parseNROItems(JSON.stringify(rawItems));
     res.status(201).json({ message: 'Đã thêm vật phẩm', data: items });
   } catch (err) {
     console.error('POST /api/admin/players/:id/inventory error:', err);
@@ -1011,7 +1035,7 @@ app.delete('/api/admin/players/:playerId/inventory/:slot', async (req, res) => {
 
     await pool.query('UPDATE player SET items_bag = ? WHERE id = ?', [JSON.stringify(rawItems), playerId]);
 
-    const items = parseNROItems(JSON.stringify(rawItems));
+    const items = await parseNROItems(JSON.stringify(rawItems));
     res.json({ message: 'Đã xóa vật phẩm', data: items });
   } catch (err) {
     console.error('DELETE /api/admin/players/:playerId/inventory/:slot error:', err);
@@ -1019,22 +1043,38 @@ app.delete('/api/admin/players/:playerId/inventory/:slot', async (req, res) => {
   }
 });
 
-// GET /api/admin/icon-list — Lấy danh sách icon ID có sẵn
-app.get('/api/admin/icon-list', async (req, res) => {
+// GET /api/admin/item-templates — Lấy danh sách item từ item_template (cho item picker)
+app.get('/api/admin/item-templates', async (req, res) => {
   try {
-    const { readdirSync } = await import('fs');
-    const iconDir = join(mediaDir, 'icon');
-    if (!existsSync(iconDir)) {
-      return res.json({ data: [] });
+    const { search, page = 1, limit = 100 } = req.query;
+    let sql = 'SELECT id, NAME as name, icon_id, TYPE as type, gender, level, description FROM item_template WHERE 1=1';
+    const params = [];
+
+    if (search) {
+      const searchNum = parseInt(search, 10);
+      if (!isNaN(searchNum)) {
+        sql += ' AND (id = ? OR NAME LIKE ? OR icon_id = ?)';
+        params.push(searchNum, `%${search}%`, searchNum);
+      } else {
+        sql += ' AND NAME LIKE ?';
+        params.push(`%${search}%`);
+      }
     }
-    const files = readdirSync(iconDir)
-      .filter(f => f.endsWith('.png'))
-      .map(f => parseInt(f.replace('.png', ''), 10))
-      .filter(n => !isNaN(n))
-      .sort((a, b) => a - b);
-    res.json({ data: files });
+
+    sql += ' ORDER BY id ASC';
+
+    const countSql = sql.replace('SELECT id, NAME as name, icon_id, TYPE as type, gender, level, description', 'SELECT COUNT(*) as total');
+    const [countRows] = await pool.query(countSql, params);
+    const total = countRows[0].total;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(Number(limit), offset);
+
+    const [rows] = await pool.query(sql, params);
+    res.json({ data: rows, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
   } catch (err) {
-    console.error('GET /api/admin/icon-list error:', err);
+    console.error('GET /api/admin/item-templates error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
