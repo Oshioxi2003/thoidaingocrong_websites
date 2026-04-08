@@ -539,13 +539,25 @@ app.post('/api/giftcodes', async (req, res) => {
   }
 });
 
-// POST /api/giftcodes/redeem — Đổi giftcode
+// POST /api/giftcodes/redeem — Đổi giftcode (yêu cầu đã tạo nhân vật)
 app.post('/api/giftcodes/redeem', async (req, res) => {
   try {
-    const { code } = req.body;
+    const { code, user_id } = req.body;
     if (!code) {
       return res.status(400).json({ error: 'Vui lòng nhập mã giftcode' });
     }
+    if (!user_id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập để sử dụng giftcode' });
+    }
+
+    // Kiểm tra player đã tạo chưa
+    const [players] = await pool.query('SELECT id, name, giftcode, pending_gift_items FROM player WHERE account_id = ?', [user_id]);
+    if (players.length === 0) {
+      return res.status(400).json({ error: 'Bạn chưa tạo nhân vật trong game. Vui lòng vào game tạo nhân vật trước!' });
+    }
+    const player = players[0];
+
+    // Kiểm tra giftcode có tồn tại và còn hạn
     const [rows] = await pool.query(
       'SELECT * FROM giftcode WHERE code = ? AND count_left > 0 AND expired > NOW()',
       [code]
@@ -553,8 +565,48 @@ app.post('/api/giftcodes/redeem', async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Mã không hợp lệ hoặc đã hết hạn' });
     }
-    await pool.query('UPDATE giftcode SET count_left = count_left - 1 WHERE id = ?', [rows[0].id]);
-    res.json({ message: 'Đổi mã thành công!', reward: rows[0].detail });
+    const gc = rows[0];
+
+    // Kiểm tra player đã dùng giftcode này chưa
+    let usedCodes = [];
+    try {
+      usedCodes = JSON.parse(player.giftcode || '[]');
+    } catch { usedCodes = []; }
+
+    if (usedCodes.includes(code)) {
+      return res.status(400).json({ error: 'Bạn đã sử dụng mã này rồi!' });
+    }
+
+    // Thêm code vào danh sách đã dùng
+    usedCodes.push(code);
+
+    // Thêm items vào pending_gift_items để game server phát thưởng
+    let pendingItems = [];
+    try {
+      pendingItems = JSON.parse(player.pending_gift_items || '[]');
+    } catch { pendingItems = []; }
+
+    let rewardItems = [];
+    try {
+      rewardItems = JSON.parse(gc.detail || '[]');
+    } catch { rewardItems = []; }
+
+    pendingItems.push(...rewardItems);
+
+    // Cập nhật player
+    await pool.query(
+      'UPDATE player SET giftcode = ?, pending_gift_items = ? WHERE id = ?',
+      [JSON.stringify(usedCodes), JSON.stringify(pendingItems), player.id]
+    );
+
+    // Giảm count_left
+    await pool.query('UPDATE giftcode SET count_left = count_left - 1 WHERE id = ?', [gc.id]);
+
+    res.json({
+      message: `Đổi mã thành công! Phần thưởng đã được gửi cho nhân vật "${player.name}". Vào game để nhận!`,
+      reward: gc.detail,
+      player_name: player.name,
+    });
   } catch (err) {
     console.error('POST /api/giftcodes/redeem error:', err);
     res.status(500).json({ error: 'Lỗi server' });
@@ -808,6 +860,274 @@ app.get('/api/deposit/history', async (req, res) => {
   } catch (err) {
     console.error('GET /api/deposit/history error:', err);
     res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ======================== ADMIN — PLAYER INVENTORY ========================
+
+// Helper: parse NRO items_bag JSON format
+// Each item is a string: "[item_id, quantity, \"[options]\", timestamp]"
+function parseNROItems(itemsBagJson) {
+  const result = [];
+  try {
+    const rawItems = JSON.parse(itemsBagJson || '[]');
+    for (let i = 0; i < rawItems.length; i++) {
+      try {
+        const parsed = JSON.parse(rawItems[i]);
+        const itemId = parsed[0];
+        if (itemId === -1) continue; // skip empty slots
+        result.push({
+          slot: i,
+          item_id: itemId,
+          quantity: parsed[1] || 0,
+          options: typeof parsed[2] === 'string' ? parsed[2] : JSON.stringify(parsed[2] || '[]'),
+        });
+      } catch { continue; }
+    }
+  } catch { /* invalid JSON */ }
+  return result;
+}
+
+// GET /api/admin/players — Tìm kiếm nhân vật theo tên
+app.get('/api/admin/players', async (req, res) => {
+  try {
+    const { search, page = 1, limit = 20 } = req.query;
+    let sql = 'SELECT id, name, account_id, head FROM player WHERE 1=1';
+    const params = [];
+
+    if (search) {
+      sql += ' AND name LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    sql += ' ORDER BY id ASC';
+
+    const countSql = sql.replace('SELECT id, name, account_id, head', 'SELECT COUNT(*) as total');
+    const [countRows] = await pool.query(countSql, params);
+    const total = countRows[0].total;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(Number(limit), offset);
+
+    const [rows] = await pool.query(sql, params);
+    res.json({ data: rows, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    console.error('GET /api/admin/players error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/players/:id/inventory — Lấy hành trang của nhân vật
+app.get('/api/admin/players/:id/inventory', async (req, res) => {
+  try {
+    const playerId = req.params.id;
+    const [rows] = await pool.query(
+      'SELECT items_bag FROM player WHERE id = ?',
+      [playerId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhân vật' });
+    }
+
+    const items = parseNROItems(rows[0].items_bag);
+    res.json({ data: items });
+  } catch (err) {
+    console.error('GET /api/admin/players/:id/inventory error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// POST /api/admin/players/:id/inventory — Thêm vật phẩm vào hành trang
+app.post('/api/admin/players/:id/inventory', async (req, res) => {
+  try {
+    const playerId = req.params.id;
+    const { item_id, quantity = 1, options = '[]' } = req.body;
+
+    if (item_id === undefined || item_id === null) {
+      return res.status(400).json({ error: 'Thiếu item_id' });
+    }
+
+    // Lấy items_bag hiện tại
+    const [rows] = await pool.query('SELECT items_bag FROM player WHERE id = ?', [playerId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhân vật' });
+    }
+
+    let rawItems = [];
+    try { rawItems = JSON.parse(rows[0].items_bag || '[]'); } catch { rawItems = []; }
+
+    // Tìm slot trống (item_id = -1) hoặc thêm cuối
+    const timestamp = Date.now();
+    const newItem = `[${item_id},${quantity},${JSON.stringify(options)},${timestamp}]`;
+
+    let inserted = false;
+    for (let i = 0; i < rawItems.length; i++) {
+      try {
+        const parsed = JSON.parse(rawItems[i]);
+        if (parsed[0] === -1) {
+          rawItems[i] = newItem;
+          inserted = true;
+          break;
+        }
+      } catch { continue; }
+    }
+    if (!inserted) {
+      rawItems.push(newItem);
+    }
+
+    // Cập nhật DB
+    await pool.query('UPDATE player SET items_bag = ? WHERE id = ?', [JSON.stringify(rawItems), playerId]);
+
+    const items = parseNROItems(JSON.stringify(rawItems));
+    res.status(201).json({ message: 'Đã thêm vật phẩm', data: items });
+  } catch (err) {
+    console.error('POST /api/admin/players/:id/inventory error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// DELETE /api/admin/players/:playerId/inventory/:slot — Xóa vật phẩm khỏi hành trang
+app.delete('/api/admin/players/:playerId/inventory/:slot', async (req, res) => {
+  try {
+    const { playerId, slot } = req.params;
+    const slotIdx = Number(slot);
+
+    const [rows] = await pool.query('SELECT items_bag FROM player WHERE id = ?', [playerId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhân vật' });
+    }
+
+    let rawItems = [];
+    try { rawItems = JSON.parse(rows[0].items_bag || '[]'); } catch { rawItems = []; }
+
+    if (slotIdx < 0 || slotIdx >= rawItems.length) {
+      return res.status(404).json({ error: 'Không tìm thấy vật phẩm ở slot này' });
+    }
+
+    // Đặt slot thành empty: [-1,0,"[]",timestamp]
+    const timestamp = Date.now();
+    rawItems[slotIdx] = `[-1,0,"[]",${timestamp}]`;
+
+    await pool.query('UPDATE player SET items_bag = ? WHERE id = ?', [JSON.stringify(rawItems), playerId]);
+
+    const items = parseNROItems(JSON.stringify(rawItems));
+    res.json({ message: 'Đã xóa vật phẩm', data: items });
+  } catch (err) {
+    console.error('DELETE /api/admin/players/:playerId/inventory/:slot error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/icon-list — Lấy danh sách icon ID có sẵn
+app.get('/api/admin/icon-list', async (req, res) => {
+  try {
+    const { readdirSync } = await import('fs');
+    const iconDir = join(mediaDir, 'icon');
+    if (!existsSync(iconDir)) {
+      return res.json({ data: [] });
+    }
+    const files = readdirSync(iconDir)
+      .filter(f => f.endsWith('.png'))
+      .map(f => parseInt(f.replace('.png', ''), 10))
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+    res.json({ data: files });
+  } catch (err) {
+    console.error('GET /api/admin/icon-list error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ======================== SITEMAP.XML (SEO) ========================
+
+/**
+ * Vietnamese slug generator — must match frontend src/lib/seo.ts
+ */
+const VIETNAMESE_MAP_SERVER = {
+  'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+  'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+  'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+  'đ': 'd',
+  'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+  'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+  'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+  'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+  'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+  'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+  'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+  'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+  'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+};
+
+function generateSlugServer(text) {
+  return text
+    .toLowerCase()
+    .split('')
+    .map(char => VIETNAMESE_MAP_SERVER[char] || char)
+    .join('')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 80);
+}
+
+const SITE_DOMAIN = process.env.SITE_DOMAIN || 'https://thoidaingocrong.com';
+
+// GET /api/sitemap.xml — Auto-generate sitemap from database
+app.get('/api/sitemap.xml', async (req, res) => {
+  try {
+    // Static pages
+    const staticPages = [
+      { loc: '/', priority: '1.0', changefreq: 'daily' },
+      { loc: '/news', priority: '0.9', changefreq: 'daily' },
+      { loc: '/events', priority: '0.8', changefreq: 'daily' },
+      { loc: '/download', priority: '0.8', changefreq: 'weekly' },
+      { loc: '/community', priority: '0.7', changefreq: 'daily' },
+      { loc: '/giftcode', priority: '0.7', changefreq: 'daily' },
+      { loc: '/about', priority: '0.5', changefreq: 'monthly' },
+    ];
+
+    // Dynamic pages — approved posts
+    const [posts] = await pool.query(
+      "SELECT id, title, created_at FROM posts WHERE status = 'approved' OR status IS NULL ORDER BY created_at DESC LIMIT 1000"
+    );
+
+    const today = new Date().toISOString().split('T')[0];
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+    // Static pages
+    for (const page of staticPages) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${SITE_DOMAIN}${page.loc}</loc>\n`;
+      xml += `    <lastmod>${today}</lastmod>\n`;
+      xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
+      xml += `    <priority>${page.priority}</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    // Post pages
+    for (const post of posts) {
+      const slug = generateSlugServer(post.title);
+      const lastmod = new Date(post.created_at).toISOString().split('T')[0];
+      xml += `  <url>\n`;
+      xml += `    <loc>${SITE_DOMAIN}/news/${post.id}/${slug}</loc>\n`;
+      xml += `    <lastmod>${lastmod}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.6</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    xml += `</urlset>`;
+
+    res.set('Content-Type', 'application/xml');
+    res.send(xml);
+  } catch (err) {
+    console.error('GET /api/sitemap.xml error:', err);
+    res.status(500).send('Error generating sitemap');
   }
 });
 

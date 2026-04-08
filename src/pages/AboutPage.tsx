@@ -3,6 +3,7 @@ import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
 import { Sparkles, Target, Users, Zap } from 'lucide-react';
 import bgAbout from '@/assets/bg-about.jpg';
+import { useSEO } from '@/lib/seo';
 
 
 
@@ -14,6 +15,12 @@ const values = [
 ];
 
 export default function AboutPage() {
+  useSEO({
+    title: 'Giới thiệu',
+    description: 'Giới thiệu về Thời Đại Ngọc Rồng — Game nhập vai hành động lấy cảm hứng từ vũ trụ Dragon Ball, nơi bạn hóa thân thành chiến binh mạnh mẽ.',
+    canonical: '/about',
+  });
+
   return (
     <PageBackground src={bgAbout}>
       <div className="py-20">

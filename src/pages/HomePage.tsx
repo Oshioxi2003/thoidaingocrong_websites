@@ -7,10 +7,17 @@ import SectionTitle from '@/components/shared/SectionTitle';
 import heroCharacter from '@/assets/hero-character.jpg';
 import heroBgExtended from '@/assets/hero-bg-extended.jpg';
 import { fetchPosts, type Post } from '@/lib/api';
+import { useSEO, getPostUrl } from '@/lib/seo';
 
 const CATEGORY_LABELS: Record<number, string> = { 0: 'Tin tức', 1: 'Sự kiện', 2: 'Hướng dẫn', 3: 'Cập nhật', 4: 'Cộng đồng' };
 
 export default function HomePage() {
+  useSEO({
+    title: 'Trang chủ',
+    description: 'Thời Đại Ngọc Rồng — Game nhập vai hành động lấy cảm hứng từ Dragon Ball. Thu thập Ngọc Rồng, chiến đấu với chiến binh toàn vũ trụ. Tải game miễn phí!',
+    canonical: '/',
+  });
+
   const { data: newsData } = useQuery({
     queryKey: ['home-news'],
     queryFn: () => fetchPosts({ limit: 3 }),
@@ -119,7 +126,7 @@ export default function HomePage() {
           <div className="grid gap-6 md:grid-cols-3">
             {latestPosts.map((item: Post, i: number) => (
               <AnimatedSection key={item.id} delay={i * 0.1}>
-                <Link to={`/news/${item.id}`} className="group block rounded-2xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+                <Link to={getPostUrl(item.id, item.title)} className="group block rounded-2xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
                   <div className="mb-3 flex items-center gap-2">
                     <Newspaper size={16} className="text-primary" />
                     <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">{CATEGORY_LABELS[item.category] || 'Khác'}</span>
@@ -143,7 +150,7 @@ export default function HomePage() {
             <div className="grid gap-6 md:grid-cols-3">
               {eventPosts.map((event: Post, i: number) => (
                 <AnimatedSection key={event.id} delay={i * 0.1}>
-                  <Link to={`/news/${event.id}`} className="group block rounded-2xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+                  <Link to={getPostUrl(event.id, event.title)} className="group block rounded-2xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
                     <div className="mb-3 flex items-center justify-between">
                       <Flame size={20} className="text-accent" />
                       {event.badge && (

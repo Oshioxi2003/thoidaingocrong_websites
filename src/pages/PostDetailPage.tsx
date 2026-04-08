@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import { ArrowLeft, Calendar, Tag, Share2, ChevronRight, MessageCircle, Send, Trash2 } from 'lucide-react';
 import { fetchPost, fetchPosts, fetchComments, createComment, deleteComment, type Post, type Comment } from '@/lib/api';
 import { renderEditorData } from '@/components/shared/Editor';
+import { useSEO, generateSlug, extractPostPreview, getPostUrl, SITE_CONFIG } from '@/lib/seo';
 
 const CATEGORY_LABELS: Record<number, string> = { 0: 'Tin tức', 1: 'Sự kiện', 2: 'Hướng dẫn', 3: 'Cập nhật', 4: 'Cộng đồng' };
 
@@ -29,7 +30,8 @@ function tryRenderEditorContent(description: string): string | null {
 }
 
 export default function PostDetailPage() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<UserInfo | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -46,6 +48,16 @@ export default function PostDetailPage() {
     queryFn: () => fetchPost(Number(id)),
     enabled: !!id,
   });
+
+  // Redirect to slug URL if slug is missing or wrong
+  useEffect(() => {
+    if (post && post.title) {
+      const correctSlug = generateSlug(post.title);
+      if (!slug || slug !== correctSlug) {
+        navigate(`/news/${post.id}/${correctSlug}`, { replace: true });
+      }
+    }
+  }, [post, slug, navigate]);
 
   // Related posts (same category)
   const { data: relatedData } = useQuery({
@@ -84,6 +96,40 @@ export default function PostDetailPage() {
     },
   });
 
+  // ===== SEO: Dynamic title, meta, JSON-LD =====
+  const tag = post ? (CATEGORY_LABELS[post.category] || 'Khác') : '';
+  const postPreview = post ? extractPostPreview(post.description) : '';
+  const canonicalUrl = post ? `/news/${post.id}/${generateSlug(post.title)}` : undefined;
+
+  useSEO({
+    title: post ? post.title : 'Đang tải...',
+    description: postPreview,
+    ogType: 'article',
+    canonical: canonicalUrl,
+    jsonLd: post ? {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: post.title,
+      description: postPreview,
+      datePublished: post.created_at,
+      dateModified: post.created_at,
+      author: {
+        '@type': 'Person',
+        name: post.author_name || 'Ngọc Rồng Team',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: SITE_CONFIG.name,
+        url: SITE_CONFIG.domain,
+      },
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': `${SITE_CONFIG.domain}${canonicalUrl}`,
+      },
+      articleSection: tag,
+    } : undefined,
+  });
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -105,7 +151,6 @@ export default function PostDetailPage() {
   }
 
   const related = (relatedData?.data || []).filter((p: Post) => p.id !== post.id).slice(0, 3);
-  const tag = CATEGORY_LABELS[post.category] || 'Khác';
   const comments = commentsData?.data || [];
 
   // Try to render as Editor.js content first, fallback to plain text
@@ -118,18 +163,34 @@ export default function PostDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero */}
+    <main className="min-h-screen bg-background">
+      {/* Hero / Breadcrumb */}
       <div className="relative bg-gradient-to-b from-primary/5 to-background px-6 pb-10 pt-24">
-        <Link
-          to={isCommunity ? '/community' : '/news'}
-          className="absolute left-6 top-24 z-20 flex items-center gap-2 rounded-full bg-card/80 px-4 py-2 text-sm font-medium text-foreground backdrop-blur-sm transition-colors hover:bg-card"
-        >
-          <ArrowLeft size={16} />
-          Quay lại
-        </Link>
+        {/* Breadcrumb for SEO */}
+        <nav aria-label="Breadcrumb" className="container mx-auto max-w-4xl mb-4 pt-8">
+          <ol className="flex items-center gap-2 text-sm text-muted-foreground" itemScope itemType="https://schema.org/BreadcrumbList">
+            <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+              <Link to="/" itemProp="item" className="hover:text-primary transition-colors">
+                <span itemProp="name">Trang chủ</span>
+              </Link>
+              <meta itemProp="position" content="1" />
+            </li>
+            <span>/</span>
+            <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+              <Link to={isCommunity ? '/community' : '/news'} itemProp="item" className="hover:text-primary transition-colors">
+                <span itemProp="name">{isCommunity ? 'Cộng đồng' : 'Tin tức'}</span>
+              </Link>
+              <meta itemProp="position" content="2" />
+            </li>
+            <span>/</span>
+            <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+              <span itemProp="name" className="text-foreground font-medium truncate max-w-[200px] inline-block align-bottom">{post.title}</span>
+              <meta itemProp="position" content="3" />
+            </li>
+          </ol>
+        </nav>
 
-        <div className="container mx-auto max-w-4xl pt-8">
+        <div className="container mx-auto max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -142,10 +203,10 @@ export default function PostDetailPage() {
               {post.title}
             </h1>
             <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
+              <time dateTime={post.created_at} className="flex items-center gap-1.5">
                 <Calendar size={14} />
                 {new Date(post.created_at).toLocaleDateString('vi-VN')}
-              </span>
+              </time>
               <span className="flex items-center gap-1.5">
                 <Tag size={14} />
                 {tag}
@@ -171,10 +232,10 @@ export default function PostDetailPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">{post.author_name || 'Ngọc Rồng Team'}</p>
-                <p className="text-xs text-muted-foreground">{new Date(post.created_at).toLocaleString('vi-VN')}</p>
+                <time dateTime={post.created_at} className="text-xs text-muted-foreground">{new Date(post.created_at).toLocaleString('vi-VN')}</time>
               </div>
             </div>
-            <button className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <button className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Chia sẻ bài viết">
               <Share2 size={14} />
               Chia sẻ
             </button>
@@ -237,7 +298,7 @@ export default function PostDetailPage() {
         {/* Comments Section — only for community posts (category 4) */}
         {isCommunity && (
           <AnimatedSection delay={0.25}>
-            <div className="mt-12 border-t border-border pt-8">
+            <section className="mt-12 border-t border-border pt-8" aria-label="Bình luận">
               <h2 className="mb-6 flex items-center gap-2 font-display text-xl font-bold text-foreground">
                 <MessageCircle size={22} className="text-primary" />
                 Bình luận ({comments.length})
@@ -310,15 +371,16 @@ export default function PostDetailPage() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-semibold text-foreground">{comment.username}</span>
-                              <span className="text-xs text-muted-foreground">
+                              <time dateTime={comment.created_at} className="text-xs text-muted-foreground">
                                 {new Date(comment.created_at).toLocaleString('vi-VN')}
-                              </span>
+                              </time>
                             </div>
                             {user && (user.id === comment.user_id || user.is_admin === 1) && (
                               <button
                                 onClick={() => { if (confirm('Xóa bình luận này?')) deleteCommentMutation.mutate(comment.id); }}
                                 className="rounded-lg p-1 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors hover:text-destructive"
                                 title="Xóa bình luận"
+                                aria-label="Xóa bình luận"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -331,20 +393,20 @@ export default function PostDetailPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           </AnimatedSection>
         )}
 
         {/* Related Posts */}
         {related.length > 0 && (
           <AnimatedSection delay={0.3}>
-            <div className="mt-16">
+            <section className="mt-16" aria-label="Bài viết liên quan">
               <h2 className="mb-8 font-display text-2xl font-bold text-foreground">Bài viết liên quan</h2>
               <div className="grid gap-6 md:grid-cols-3">
                 {related.map((item: Post, i: number) => (
                   <Link
                     key={item.id}
-                    to={`/news/${item.id}`}
+                    to={getPostUrl(item.id, item.title)}
                     className="group overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:border-primary/30 hover:shadow-glow"
                   >
                     <motion.div
@@ -360,18 +422,18 @@ export default function PostDetailPage() {
                         <h3 className="mt-2 font-display text-sm font-semibold text-foreground line-clamp-2 transition-colors group-hover:text-primary">
                           {item.title}
                         </h3>
-                        <p className="mt-2 text-xs text-muted-foreground">
+                        <time dateTime={item.created_at} className="mt-2 block text-xs text-muted-foreground">
                           {new Date(item.created_at).toLocaleDateString('vi-VN')}
-                        </p>
+                        </time>
                       </div>
                     </motion.div>
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           </AnimatedSection>
         )}
       </div>
-    </div>
+    </main>
   );
 }

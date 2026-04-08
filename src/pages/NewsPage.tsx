@@ -7,6 +7,7 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import bgNews from '@/assets/bg-news.jpg';
 import { fetchPosts, type Post } from '@/lib/api';
+import { useSEO, getPostUrl } from '@/lib/seo';
 
 const CATEGORY_LABELS: Record<number, string> = { 0: 'Tin tức', 1: 'Sự kiện', 2: 'Hướng dẫn', 3: 'Cập nhật', 4: 'Cộng đồng' };
 const TAGS = ['Tất cả', 'Tin tức', 'Sự kiện', 'Hướng dẫn', 'Cập nhật'];
@@ -34,6 +35,12 @@ export default function NewsPage() {
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState('Tất cả');
   const [page, setPage] = useState(1);
+
+  useSEO({
+    title: 'Tin tức',
+    description: 'Cập nhật tin tức mới nhất từ Thời Đại Ngọc Rồng. Tin tức game, sự kiện, hướng dẫn chơi và cập nhật phiên bản mới.',
+    canonical: '/news',
+  });
 
   const categoryParam = activeTag === 'Tất cả' ? undefined : TAG_TO_CATEGORY[activeTag];
 
@@ -95,7 +102,7 @@ export default function NewsPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {posts.map((item: Post, i: number) => (
                 <AnimatedSection key={item.id} delay={i * 0.05}>
-                  <Link to={`/news/${item.id}`} className="group block rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+                  <Link to={getPostUrl(item.id, item.title)} className="group block rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
                     <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary">
                       {CATEGORY_LABELS[item.category] || 'Khác'}
                     </span>

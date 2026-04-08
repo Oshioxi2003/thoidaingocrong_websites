@@ -8,6 +8,7 @@ import PageBackground from '@/components/shared/PageBackground';
 import { MessageCircle, Users, ExternalLink, Plus, Calendar, ChevronRight } from 'lucide-react';
 import bgCommunity from '@/assets/bg-community.jpg';
 import { fetchPosts, type Post } from '@/lib/api';
+import { useSEO, getPostUrl } from '@/lib/seo';
 
 const communities = [
   { name: 'Facebook Group', desc: 'Tham gia cộng đồng 50.000+ thành viên trên Facebook', url: 'https://www.facebook.com/thoidaingocrong/', icon: Users, members: '50K+' },
@@ -23,6 +24,12 @@ interface UserInfo {
 
 export default function CommunityPage() {
   const [user, setUser] = useState<UserInfo | null>(null);
+
+  useSEO({
+    title: 'Cộng đồng',
+    description: 'Cộng đồng Thời Đại Ngọc Rồng — Kết nối với hàng nghìn chiến binh, chia sẻ kinh nghiệm, chiến thuật và tham gia thảo luận.',
+    canonical: '/community',
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -99,7 +106,7 @@ export default function CommunityPage() {
                       transition={{ delay: i * 0.05 }}
                     >
                       <Link
-                        to={`/news/${post.id}`}
+                        to={getPostUrl(post.id, post.title)}
                         className="group block rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/20 hover:shadow-glow"
                       >
                         <div className="flex items-start justify-between gap-4">

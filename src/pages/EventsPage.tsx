@@ -5,6 +5,7 @@ import PageBackground from '@/components/shared/PageBackground';
 import { Clock, Flame, CalendarX } from 'lucide-react';
 import { fetchPosts, type Post } from '@/lib/api';
 import bgEvents from '@/assets/bg-events.jpg';
+import { useSEO } from '@/lib/seo';
 
 function useCountdown(endDate: string | null) {
   const [remaining, setRemaining] = useState(() => {
@@ -74,6 +75,12 @@ function EventCard({ event, index }: { event: Post; index: number }) {
 export default function EventsPage() {
   const [events, setEvents] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useSEO({
+    title: 'Sự kiện',
+    description: 'Sự kiện Thời Đại Ngọc Rồng — Tham gia các sự kiện nổi bật, nhận thưởng cực khủng và trải nghiệm gameplay độc đáo.',
+    canonical: '/events',
+  });
 
   useEffect(() => {
     fetchPosts({ category: 1, limit: 50 })

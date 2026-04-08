@@ -3,6 +3,7 @@ import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
 import { Smartphone, Monitor, Apple, Download, ExternalLink, Shield, Zap, Star } from 'lucide-react';
 import bgDownload from '@/assets/bg-download.jpg';
+import { useSEO } from '@/lib/seo';
 
 // ⚠️ Khi publish ra public, đổi URL này thành domain thật của bạn
 const SITE_URL = 'https://thoidaingocrong.com';
@@ -58,6 +59,12 @@ const features = [
 ];
 
 export default function DownloadPage() {
+  useSEO({
+    title: 'Tải Game',
+    description: 'Tải Thời Đại Ngọc Rồng miễn phí cho Android, iOS và PC. Cài đặt nhanh chóng, bảo mật và luôn cập nhật phiên bản mới nhất.',
+    canonical: '/download',
+  });
+
   return (
     <PageBackground src={bgDownload}>
       <div className="py-20">

@@ -196,10 +196,10 @@ export async function createGiftcode(data: {
   });
 }
 
-export async function redeemGiftcode(code: string): Promise<{ message: string; reward: string }> {
-  return request<{ message: string; reward: string }>('/giftcodes/redeem', {
+export async function redeemGiftcode(code: string, user_id: number): Promise<{ message: string; reward: string; player_name: string }> {
+  return request<{ message: string; reward: string; player_name: string }>('/giftcodes/redeem', {
     method: 'POST',
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, user_id }),
   });
 }
 
@@ -258,4 +258,59 @@ export async function checkDeposit(deposit_id: number): Promise<DepositCheckResp
 
 export async function fetchDepositHistory(userId: number, page = 1): Promise<PaginatedResponse<DepositOrder>> {
   return request<PaginatedResponse<DepositOrder>>(`/deposit/history?user_id=${userId}&page=${page}`);
+}
+
+// ============ Admin — Player Inventory API ============
+
+export interface Player {
+  id: number;
+  name: string;
+  account_id: number;
+  head: number;
+}
+
+export interface InventoryItem {
+  id: number;
+  player_id: number;
+  item_id: number;
+  quantity: number;
+  slot: number;
+  options: string;
+}
+
+export async function fetchPlayers(params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<Player>> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.limit) q.set('limit', String(params.limit));
+  return request<PaginatedResponse<Player>>(`/admin/players?${q.toString()}`);
+}
+
+export async function fetchPlayerInventory(playerId: number): Promise<{ data: InventoryItem[] }> {
+  return request<{ data: InventoryItem[] }>(`/admin/players/${playerId}/inventory`);
+}
+
+export async function addInventoryItem(playerId: number, data: {
+  item_id: number;
+  quantity?: number;
+  options?: string;
+}): Promise<{ message: string; data: InventoryItem[] }> {
+  return request<{ message: string; data: InventoryItem[] }>(`/admin/players/${playerId}/inventory`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteInventoryItem(playerId: number, slot: number): Promise<{ message: string; data: InventoryItem[] }> {
+  return request<{ message: string; data: InventoryItem[] }>(`/admin/players/${playerId}/inventory/${slot}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchIconList(): Promise<{ data: number[] }> {
+  return request<{ data: number[] }>('/admin/icon-list');
 }

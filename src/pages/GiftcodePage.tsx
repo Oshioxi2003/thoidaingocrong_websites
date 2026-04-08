@@ -1,17 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
-import { Gift, Check, X, Copy } from 'lucide-react';
+import { Gift, Check, X, Copy, LogIn, User, Gamepad2 } from 'lucide-react';
 import bgGiftcode from '@/assets/bg-giftcode.jpg';
 import { fetchGiftcodes, redeemGiftcode, type Giftcode } from '@/lib/api';
+import { useSEO } from '@/lib/seo';
+
+interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  is_admin: number;
+}
 
 export default function GiftcodePage() {
   const [code, setCode] = useState('');
   const [result, setResult] = useState<'success' | 'error' | null>(null);
   const [resultMsg, setResultMsg] = useState('');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const navigate = useNavigate();
+
+  useSEO({
+    title: 'Giftcode',
+    description: 'Nhập mã Giftcode Thời Đại Ngọc Rồng để nhận quà miễn phí. Cập nhật danh sách giftcode mới nhất, còn hạn sử dụng.',
+    canonical: '/giftcode',
+  });
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) setUser(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
 
   const { data } = useQuery({
     queryKey: ['public-giftcodes'],
@@ -19,22 +43,28 @@ export default function GiftcodePage() {
   });
 
   const redeemMutation = useMutation({
-    mutationFn: (c: string) => redeemGiftcode(c),
+    mutationFn: (c: string) => redeemGiftcode(c, user!.id),
     onSuccess: (data) => {
       setResult('success');
       setResultMsg(data.message);
-      setTimeout(() => setResult(null), 3000);
+      setTimeout(() => setResult(null), 5000);
     },
     onError: (err: Error) => {
       setResult('error');
       setResultMsg(err.message);
-      setTimeout(() => setResult(null), 3000);
+      setTimeout(() => setResult(null), 5000);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
+    if (!user) {
+      setResult('error');
+      setResultMsg('Vui lòng đăng nhập để sử dụng giftcode');
+      setTimeout(() => setResult(null), 3000);
+      return;
+    }
     redeemMutation.mutate(code.trim());
   };
 
@@ -51,6 +81,34 @@ export default function GiftcodePage() {
       <div className="container mx-auto px-4">
         <SectionTitle title="Giftcode" subtitle="Nhập mã để nhận quà miễn phí" />
 
+        {/* Login Warning */}
+        {!user && (
+          <AnimatedSection className="mx-auto mb-8 max-w-md">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-center backdrop-blur-sm">
+              <LogIn size={28} className="mx-auto mb-3 text-amber-400" />
+              <p className="mb-1 font-display text-sm font-semibold text-amber-300">Bạn chưa đăng nhập</p>
+              <p className="mb-4 text-xs text-amber-300/70">Đăng nhập để có thể nhập mã giftcode và nhận phần thưởng</p>
+              <button
+                onClick={() => navigate('/auth')}
+                className="inline-flex items-center gap-2 rounded-xl gradient-fire px-6 py-2.5 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02]"
+              >
+                <LogIn size={16} /> Đăng nhập ngay
+              </button>
+            </div>
+          </AnimatedSection>
+        )}
+
+        {/* User Info */}
+        {user && (
+          <AnimatedSection className="mx-auto mb-4 max-w-md">
+            <div className="flex items-center justify-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 backdrop-blur-sm">
+              <User size={16} className="text-primary" />
+              <span className="text-sm text-muted-foreground">Tài khoản:</span>
+              <span className="font-display text-sm font-semibold text-foreground">{user.username}</span>
+            </div>
+          </AnimatedSection>
+        )}
+
         {/* Input Form */}
         <AnimatedSection className="mx-auto mb-16 max-w-md">
           <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-8">
@@ -60,14 +118,24 @@ export default function GiftcodePage() {
               onChange={e => setCode(e.target.value)}
               placeholder="Nhập giftcode tại đây..."
               className="w-full rounded-xl border border-border bg-background py-3 px-4 text-center font-mono text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              disabled={!user}
             />
             <button
               type="submit"
-              disabled={redeemMutation.isPending}
-              className="mt-4 w-full rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] disabled:opacity-60"
+              disabled={redeemMutation.isPending || !user}
+              className="mt-4 w-full rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {redeemMutation.isPending ? 'Đang xử lý...' : 'Đổi mã'}
+              {redeemMutation.isPending ? 'Đang xử lý...' : !user ? 'Đăng nhập để đổi mã' : 'Đổi mã'}
             </button>
+
+            {/* Lưu ý */}
+            <div className="mt-4 flex items-start gap-2 rounded-lg bg-muted/50 p-3">
+              <Gamepad2 size={16} className="mt-0.5 shrink-0 text-primary" />
+              <p className="text-xs text-muted-foreground">
+                Bạn cần <strong className="text-foreground">tạo nhân vật trong game</strong> trước khi nhập mã. 
+                Phần thưởng sẽ được gửi vào hộp thư nhân vật khi bạn đăng nhập game.
+              </p>
+            </div>
 
             <AnimatePresence>
               {result && (

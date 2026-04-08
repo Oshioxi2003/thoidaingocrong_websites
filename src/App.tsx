@@ -48,6 +48,7 @@ const App = () => {
             <Route path="/about" element={<Layout isDark={isDark} onToggleTheme={toggle}><AboutPage /></Layout>} />
             <Route path="/download" element={<Layout isDark={isDark} onToggleTheme={toggle}><DownloadPage /></Layout>} />
             <Route path="/news" element={<Layout isDark={isDark} onToggleTheme={toggle}><NewsPage /></Layout>} />
+            <Route path="/news/:id/:slug" element={<Layout isDark={isDark} onToggleTheme={toggle}><PostDetailPage /></Layout>} />
             <Route path="/news/:id" element={<Layout isDark={isDark} onToggleTheme={toggle}><PostDetailPage /></Layout>} />
             <Route path="/events" element={<Layout isDark={isDark} onToggleTheme={toggle}><EventsPage /></Layout>} />
             <Route path="/giftcode" element={<Layout isDark={isDark} onToggleTheme={toggle}><GiftcodePage /></Layout>} />
