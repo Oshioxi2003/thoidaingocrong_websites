@@ -207,6 +207,29 @@ export async function deleteGiftcode(id: number): Promise<{ message: string }> {
   return request<{ message: string }>(`/giftcodes/${id}`, { method: 'DELETE' });
 }
 
+export interface ItemOption {
+  id: number;
+  name: string;
+  color: number;
+}
+
+export interface GiftcodeDetailItem {
+  id: number;
+  quantity: number;
+  options: { id: number; param: number }[];
+  icon_id: number;
+  name: string;
+  slot: number;
+}
+
+export async function fetchItemOptions(): Promise<{ data: ItemOption[] }> {
+  return request<{ data: ItemOption[] }>('/admin/item-options');
+}
+
+export async function fetchGiftcodeItems(gcId: number): Promise<{ data: GiftcodeDetailItem[] }> {
+  return request<{ data: GiftcodeDetailItem[] }>(`/admin/giftcode-items/${gcId}`);
+}
+
 // ============ Stats API ============
 
 export async function fetchStats(): Promise<{ totalPosts: number; totalUsers: number; totalGiftcodes: number }> {

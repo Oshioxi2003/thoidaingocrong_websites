@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,9 +9,10 @@ import {
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
   fetchUsers, banUser,
-  fetchGiftcodes, createGiftcode, deleteGiftcode,
+  fetchGiftcodes, createGiftcode, deleteGiftcode, fetchItemOptions, fetchGiftcodeItems,
   fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
-  type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate
+  type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate,
+  type ItemOption, type GiftcodeDetailItem
 } from '@/lib/api';
 
 /* ============ SHARED PAGINATION ============ */
@@ -556,10 +557,7 @@ function GiftcodesTab() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreate, setShowCreate] = useState(false);
-  const [newCode, setNewCode] = useState('');
-  const [newCount, setNewCount] = useState(100);
-  const [newDetail, setNewDetail] = useState('');
-  const [newExpired, setNewExpired] = useState('2030-01-01');
+  const [viewGcId, setViewGcId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const perPage = 10;
   const queryClient = useQueryClient();
@@ -567,17 +565,6 @@ function GiftcodesTab() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-giftcodes', search, statusFilter],
     queryFn: () => fetchGiftcodes({ search: search || undefined, status: statusFilter }),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: createGiftcode,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-giftcodes'] });
-      setShowCreate(false);
-      setNewCode('');
-      setNewCount(100);
-      setNewDetail('');
-    },
   });
 
   const deleteMutation = useMutation({
@@ -610,60 +597,6 @@ function GiftcodesTab() {
           <Plus size={16} /> Tạo Giftcode
         </button>
       </div>
-
-      {/* Create Modal */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-glow">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold text-foreground">Tạo Giftcode mới</h3>
-              <button onClick={() => setShowCreate(false)} className="rounded-lg p-1 text-muted-foreground hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <input
-                value={newCode}
-                onChange={e => setNewCode(e.target.value.toUpperCase())}
-                placeholder="Mã giftcode (VD: NGOCRONGVIP)"
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-              />
-              <input
-                type="number"
-                value={newCount}
-                onChange={e => setNewCount(Number(e.target.value))}
-                placeholder="Số lượt sử dụng"
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-              />
-              <textarea
-                value={newDetail}
-                onChange={e => setNewDetail(e.target.value)}
-                placeholder='Chi tiết phần thưởng (JSON), VD: [{"id":457,"quantity":100,"options":[]}]'
-                rows={3}
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none resize-none"
-              />
-              <input
-                type="date"
-                value={newExpired}
-                onChange={e => setNewExpired(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none"
-              />
-              <button
-                onClick={() => createMutation.mutate({
-                  code: newCode,
-                  count_left: newCount,
-                  detail: newDetail || '[]',
-                  expired: newExpired + ' 00:00:00',
-                })}
-                disabled={!newCode || createMutation.isPending}
-                className="gradient-fire w-full rounded-xl py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                {createMutation.isPending ? 'Đang tạo...' : 'Tạo Giftcode'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
@@ -701,47 +634,603 @@ function GiftcodesTab() {
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             {giftcodes.map((gc: Giftcode, i: number) => (
-              <motion.div
+              <GiftcodeCard
                 key={gc.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="rounded-2xl border border-border bg-card p-5 shadow-card"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-display text-lg font-bold text-foreground">{gc.code}</p>
-                    <p className="mt-1 text-xs text-muted-foreground font-mono">{gc.detail}</p>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    isExpired(gc) ? 'bg-muted text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500'
-                  }`}>
-                    {isExpired(gc) ? 'Hết hạn' : 'Hoạt động'}
-                  </span>
-                </div>
-
-                <div className="mt-4">
-                  <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                    <span>Còn lại: {gc.count_left}</span>
-                    <span>Hết hạn: {new Date(gc.expired).toLocaleDateString('vi-VN')}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => { if (confirm('Xóa giftcode này?')) deleteMutation.mutate(gc.id); }}
-                    className="flex-1 rounded-xl border border-border py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                  >
-                    <Trash2 size={14} className="mx-auto" />
-                  </button>
-                </div>
-              </motion.div>
+                gc={gc}
+                isExpired={isExpired(gc)}
+                index={i}
+                onDelete={() => { if (confirm('Xóa giftcode này?')) deleteMutation.mutate(gc.id); }}
+                onView={() => setViewGcId(gc.id)}
+              />
             ))}
           </div>
           <Pagination page={page} totalPages={totalPages} total={allGiftcodes.length} perPage={perPage} onPageChange={setPage} label="giftcode" />
         </>
       )}
+
+      {/* Create Modal */}
+      {showCreate && (
+        <CreateGiftcodeModal
+          onClose={() => setShowCreate(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['admin-giftcodes'] });
+            setShowCreate(false);
+          }}
+        />
+      )}
+
+      {/* View Detail Modal */}
+      {viewGcId !== null && (
+        <ViewGiftcodeModal
+          gcId={viewGcId}
+          gc={allGiftcodes.find(g => g.id === viewGcId)!}
+          onClose={() => setViewGcId(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ============ GIFTCODE CARD ============ */
+function GiftcodeCard({ gc, isExpired: expired, index, onDelete, onView }: {
+  gc: Giftcode; isExpired: boolean; index: number; onDelete: () => void; onView: () => void;
+}) {
+  // Parse detail to show item icons
+  const items = useMemo(() => {
+    try { return JSON.parse(gc.detail || '[]'); } catch { return []; }
+  }, [gc.detail]);
+
+  // Fetch templates for icon_id mapping
+  const { data: templateData } = useQuery({
+    queryKey: ['item-templates-all'],
+    queryFn: () => fetchItemTemplates({ limit: 5000 }),
+    staleTime: 300000,
+  });
+  const templateMap = useMemo(() => {
+    const map: Record<number, { icon_id: number; name: string }> = {};
+    (templateData?.data || []).forEach(t => { map[t.id] = t; });
+    return map;
+  }, [templateData]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="rounded-2xl border border-border bg-card shadow-card overflow-hidden"
+    >
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <p className="font-display text-lg font-bold text-foreground">{gc.code}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Còn lại: <span className="text-foreground font-semibold">{gc.count_left.toLocaleString()}</span> lượt
+              • Hạn: {new Date(gc.expired).toLocaleDateString('vi-VN')}
+            </p>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            expired ? 'bg-muted text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500'
+          }`}>
+            {expired ? 'Hết hạn' : 'Hoạt động'}
+          </span>
+        </div>
+
+        {/* Item icons grid */}
+        {items.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {items.slice(0, 20).map((item: { id: number; quantity: number }, idx: number) => {
+              const t = templateMap[item.id];
+              const iconId = t?.icon_id ?? item.id;
+              return (
+                <div
+                  key={idx}
+                  className="relative flex h-12 w-12 items-center justify-center rounded-lg border border-border/60 bg-gradient-to-br from-muted/60 to-muted/20"
+                  title={`${t?.name || `Item #${item.id}`} (x${item.quantity})`}
+                >
+                  <img
+                    src={`/media/icon/${iconId}.png`}
+                    alt=""
+                    className="h-8 w-8 object-contain drop-shadow-sm"
+                    loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white leading-tight">
+                    {item.quantity > 999999 ? `${(item.quantity / 1000000).toFixed(0)}M` : item.quantity > 999 ? `${Math.round(item.quantity / 1000)}K` : item.quantity}
+                  </span>
+                </div>
+              );
+            })}
+            {items.length > 20 && (
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground">
+                +{items.length - 20}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onView}
+            className="flex-1 rounded-xl border border-border py-2 text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary inline-flex items-center justify-center gap-1"
+          >
+            <Eye size={14} /> Xem
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============ VIEW GIFTCODE MODAL ============ */
+function ViewGiftcodeModal({ gcId, gc, onClose }: { gcId: number; gc: Giftcode; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['giftcode-items', gcId],
+    queryFn: () => fetchGiftcodeItems(gcId),
+  });
+
+  const { data: optionsData } = useQuery({
+    queryKey: ['item-options'],
+    queryFn: fetchItemOptions,
+    staleTime: 300000,
+  });
+  const optionMap = useMemo(() => {
+    const map: Record<number, ItemOption> = {};
+    (optionsData?.data || []).forEach(o => { map[o.id] = o; });
+    return map;
+  }, [optionsData]);
+
+  const items = data?.data || [];
+
+  const OPTION_COLORS: Record<number, string> = {
+    0: 'text-gray-300', 1: 'text-green-400', 2: 'text-yellow-400', 3: 'text-orange-400',
+    4: 'text-red-400', 5: 'text-purple-400', 6: 'text-blue-400', 7: 'text-pink-400',
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="mx-4 w-full max-w-3xl rounded-2xl border border-border bg-card p-6 shadow-glow max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-display text-lg font-bold text-foreground">
+              Chi tiết Giftcode: <span className="text-primary">{gc.code}</span>
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {items.length} vật phẩm • Còn {gc.count_left.toLocaleString()} lượt • Hạn {new Date(gc.expired).toLocaleDateString('vi-VN')}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:text-foreground">
+            <X size={18} />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="py-12 text-center text-muted-foreground">Đang tải...</div>
+        ) : (
+          <>
+            {/* Visual item grid */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {items.map((item: GiftcodeDetailItem, idx: number) => (
+                <div
+                  key={idx}
+                  className="relative flex h-14 w-14 items-center justify-center rounded-xl border border-border/60 bg-gradient-to-br from-muted/60 to-muted/20 hover:border-primary/50 transition-colors"
+                  title={`${item.name} (x${item.quantity})`}
+                >
+                  <img
+                    src={`/media/icon/${item.icon_id}.png`}
+                    alt={item.name}
+                    className="h-9 w-9 object-contain drop-shadow-sm"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white leading-tight">
+                    {item.quantity > 999999 ? `${(item.quantity / 1000000).toFixed(0)}M` : item.quantity > 999 ? `${Math.round(item.quantity / 1000)}K` : item.quantity}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Detail table */}
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground w-10">Icon</th>
+                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Tên</th>
+                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground w-16">ID</th>
+                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground w-16">SL</th>
+                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Options</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item: GiftcodeDetailItem, idx: number) => (
+                    <tr key={idx} className="border-b border-border/50 hover:bg-muted/20">
+                      <td className="px-3 py-2">
+                        <img src={`/media/icon/${item.icon_id}.png`} alt="" className="h-7 w-7 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      </td>
+                      <td className="px-3 py-2 text-foreground font-medium">{item.name}</td>
+                      <td className="px-3 py-2 font-mono text-muted-foreground">{item.id}</td>
+                      <td className="px-3 py-2 text-foreground">{item.quantity.toLocaleString()}</td>
+                      <td className="px-3 py-2">
+                        {item.options && item.options.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {item.options.map((opt, oi) => {
+                              const optTpl = optionMap[opt.id];
+                              const colorClass = optTpl ? OPTION_COLORS[optTpl.color] || 'text-gray-300' : 'text-gray-400';
+                              const label = optTpl ? optTpl.name.replace('#', String(opt.param)) : `Option ${opt.id}: ${opt.param}`;
+                              return <span key={oi} className={`${colorClass} text-[10px]`}>{label}</span>;
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ============ CREATE GIFTCODE MODAL ============ */
+interface GiftcodeItemEntry {
+  item_id: number;
+  quantity: number;
+  options: { id: number; param: number }[];
+  icon_id?: number;
+  name?: string;
+}
+
+function CreateGiftcodeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [code, setCode] = useState('');
+  const [countLeft, setCountLeft] = useState(100);
+  const [expired, setExpired] = useState('2030-01-01');
+  const [items, setItems] = useState<GiftcodeItemEntry[]>([]);
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [itemPickerPage, setItemPickerPage] = useState(1);
+
+  // Item templates
+  const { data: templateData } = useQuery({
+    queryKey: ['item-templates', itemSearch, itemPickerPage],
+    queryFn: () => fetchItemTemplates({ search: itemSearch || undefined, page: itemPickerPage, limit: 60 }),
+    staleTime: 60000,
+  });
+
+  // Item options
+  const { data: optionsData } = useQuery({
+    queryKey: ['item-options'],
+    queryFn: fetchItemOptions,
+    staleTime: 300000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: createGiftcode,
+    onSuccess,
+  });
+
+  const itemTemplates = templateData?.data || [];
+  const totalTemplatePages = templateData?.totalPages || 1;
+  const allOptions = optionsData?.data || [];
+
+  const OPTION_COLORS: Record<number, string> = {
+    0: 'text-gray-300', 1: 'text-green-400', 2: 'text-yellow-400', 3: 'text-orange-400',
+    4: 'text-red-400', 5: 'text-purple-400', 6: 'text-blue-400', 7: 'text-pink-400',
+  };
+
+  const addItem = (t: ItemTemplate) => {
+    setItems(prev => [...prev, { item_id: t.id, quantity: 1, options: [], icon_id: t.icon_id, name: t.name }]);
+    setShowItemPicker(false);
+  };
+
+  const removeItem = (idx: number) => {
+    setItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateItemQuantity = (idx: number, qty: number) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: qty } : it));
+  };
+
+  const addOption = (itemIdx: number, optId: number) => {
+    setItems(prev => prev.map((it, i) => i === itemIdx ? { ...it, options: [...it.options, { id: optId, param: 0 }] } : it));
+  };
+
+  const removeOption = (itemIdx: number, optIdx: number) => {
+    setItems(prev => prev.map((it, i) => i === itemIdx ? { ...it, options: it.options.filter((_, oi) => oi !== optIdx) } : it));
+  };
+
+  const updateOptionParam = (itemIdx: number, optIdx: number, param: number) => {
+    setItems(prev => prev.map((it, i) => i === itemIdx ? {
+      ...it, options: it.options.map((o, oi) => oi === optIdx ? { ...o, param } : o)
+    } : it));
+  };
+
+  const handleCreate = () => {
+    const detail = JSON.stringify(items.map(it => ({
+      id: it.item_id,
+      quantity: it.quantity,
+      options: it.options,
+    })));
+    createMutation.mutate({
+      code,
+      count_left: countLeft,
+      detail,
+      expired: expired + ' 23:59:59',
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="mx-4 w-full max-w-3xl rounded-2xl border border-border bg-card p-6 shadow-glow max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold text-foreground">Tạo Giftcode mới</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:text-foreground">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Code + Count + Expired */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Mã Giftcode</label>
+              <input
+                value={code}
+                onChange={e => setCode(e.target.value.toUpperCase())}
+                placeholder="NGOCRONGVIP"
+                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Số lượt</label>
+              <input
+                type="number"
+                value={countLeft}
+                onChange={e => setCountLeft(Number(e.target.value))}
+                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Hết hạn</label>
+              <input
+                type="date"
+                value={expired}
+                onChange={e => setExpired(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Items list */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">Vật phẩm ({items.length})</label>
+              <button
+                onClick={() => setShowItemPicker(true)}
+                className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors"
+                type="button"
+              >
+                <Plus size={12} /> Thêm vật phẩm
+              </button>
+            </div>
+
+            {/* Visual preview */}
+            {items.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3 p-3 rounded-xl border border-border/50 bg-muted/10">
+                {items.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="relative flex h-12 w-12 items-center justify-center rounded-lg border border-border/60 bg-gradient-to-br from-muted/60 to-muted/20"
+                    title={`${it.name || `Item #${it.item_id}`} (x${it.quantity})`}
+                  >
+                    <img
+                      src={`/media/icon/${it.icon_id ?? it.item_id}.png`}
+                      alt=""
+                      className="h-8 w-8 object-contain"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <span className="absolute -bottom-0.5 -right-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white leading-tight">
+                      {it.quantity > 999 ? `${Math.round(it.quantity / 1000)}K` : it.quantity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Item entries */}
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {items.map((it, idx) => (
+                <div key={idx} className="rounded-xl border border-border bg-muted/10 p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <img
+                      src={`/media/icon/${it.icon_id ?? it.item_id}.png`}
+                      alt=""
+                      className="h-8 w-8 object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{it.name || `Item #${it.item_id}`}</p>
+                      <p className="text-[10px] text-muted-foreground">ID: {it.item_id}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] text-muted-foreground">SL:</label>
+                      <input
+                        type="number"
+                        value={it.quantity}
+                        onChange={e => updateItemQuantity(idx, Number(e.target.value))}
+                        min={1}
+                        className="w-20 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <button onClick={() => removeItem(idx)} className="rounded-lg p-1 text-muted-foreground hover:text-destructive">
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {/* Options */}
+                  <div className="ml-11">
+                    {it.options.map((opt, oi) => {
+                      const optTpl = allOptions.find(o => o.id === opt.id);
+                      const colorClass = optTpl ? OPTION_COLORS[optTpl.color] || 'text-gray-300' : 'text-gray-400';
+                      return (
+                        <div key={oi} className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] flex-1 ${colorClass}`}>
+                            {optTpl ? optTpl.name.replace('#', '___') : `Option ${opt.id}`}
+                          </span>
+                          <input
+                            type="number"
+                            value={opt.param}
+                            onChange={e => updateOptionParam(idx, oi, Number(e.target.value))}
+                            className="w-16 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-foreground focus:border-primary focus:outline-none"
+                            placeholder="param"
+                          />
+                          <button onClick={() => removeOption(idx, oi)} className="text-muted-foreground hover:text-destructive">
+                            <X size={10} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <ItemOptionPicker
+                      allOptions={allOptions}
+                      onSelect={(optId: number) => addOption(idx, optId)}
+                      optionColors={OPTION_COLORS}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Submit */}
+          <button
+            onClick={handleCreate}
+            disabled={!code || items.length === 0 || createMutation.isPending}
+            className="gradient-fire w-full rounded-xl py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 transition-all hover:shadow-glow"
+          >
+            {createMutation.isPending ? 'Đang tạo...' : `Tạo Giftcode (${items.length} vật phẩm)`}
+          </button>
+
+          {createMutation.isError && (
+            <p className="text-xs text-destructive text-center">Lỗi: {(createMutation.error as Error).message}</p>
+          )}
+        </div>
+
+        {/* Item Picker Overlay */}
+        <AnimatePresence>
+          {showItemPicker && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowItemPicker(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.95 }}
+                className="mx-4 w-full max-w-xl rounded-2xl border border-border bg-card p-5 shadow-glow max-h-[80vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-foreground">Chọn vật phẩm</h4>
+                  <button onClick={() => setShowItemPicker(false)} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+                </div>
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                  <Search size={14} className="text-muted-foreground" />
+                  <input
+                    value={itemSearch}
+                    onChange={e => { setItemSearch(e.target.value); setItemPickerPage(1); }}
+                    placeholder="Tìm theo tên hoặc ID..."
+                    className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8 md:grid-cols-10">
+                  {itemTemplates.map((t: ItemTemplate) => (
+                    <button
+                      key={t.id}
+                      onClick={() => addItem(t)}
+                      className="flex flex-col items-center justify-center rounded-lg border border-border/30 bg-background/50 p-1 text-[7px] transition-all hover:border-primary hover:bg-primary/10"
+                      title={`${t.name} (ID: ${t.id})`}
+                    >
+                      <img
+                        src={`/media/icon/${t.icon_id}.png`}
+                        alt={t.name}
+                        className="h-7 w-7 object-contain"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <span className="mt-0.5 text-muted-foreground truncate w-full text-center leading-tight">{t.id}</span>
+                    </button>
+                  ))}
+                </div>
+                {totalTemplatePages > 1 && (
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setItemPickerPage(p => Math.max(1, p - 1))}
+                      disabled={itemPickerPage <= 1}
+                      className="rounded px-3 py-1 text-xs border border-border hover:bg-muted disabled:opacity-30"
+                    >←</button>
+                    <span className="text-xs text-muted-foreground">{itemPickerPage}/{totalTemplatePages}</span>
+                    <button
+                      onClick={() => setItemPickerPage(p => Math.min(totalTemplatePages, p + 1))}
+                      disabled={itemPickerPage >= totalTemplatePages}
+                      className="rounded px-3 py-1 text-xs border border-border hover:bg-muted disabled:opacity-30"
+                    >→</button>
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ============ ITEM OPTION PICKER (Dropdown) ============ */
+function ItemOptionPicker({ allOptions, onSelect, optionColors }: {
+  allOptions: ItemOption[];
+  onSelect: (optId: number) => void;
+  optionColors: Record<number, string>;
+}) {
+  return (
+    <select
+      value=""
+      onChange={e => {
+        const val = Number(e.target.value);
+        if (!isNaN(val) && val >= 0) onSelect(val);
+      }}
+      className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground focus:border-primary focus:outline-none cursor-pointer"
+    >
+      <option value="">+ Thêm option...</option>
+      {allOptions.map(opt => (
+        <option key={opt.id} value={opt.id}>
+          [{opt.id}] {opt.name}
+        </option>
+      ))}
+    </select>
   );
 }
 

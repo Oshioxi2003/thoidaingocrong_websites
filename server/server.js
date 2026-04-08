@@ -1079,6 +1079,43 @@ app.get('/api/admin/item-templates', async (req, res) => {
   }
 });
 
+// GET /api/admin/item-options — Lấy danh sách item_option_template
+app.get('/api/admin/item-options', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, NAME as name, color FROM item_option_template ORDER BY id ASC');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error('GET /api/admin/item-options error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/giftcode-items/:id — Lấy detail giftcode kèm icon_id từ item_template
+app.get('/api/admin/giftcode-items/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT detail FROM giftcode WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy giftcode' });
+
+    let items = [];
+    try { items = JSON.parse(rows[0].detail || '[]'); } catch { items = []; }
+
+    const templateMap = await getItemTemplateMap();
+    const enriched = items.map((item, idx) => {
+      const t = templateMap[item.id] || {};
+      return {
+        ...item,
+        icon_id: t.icon_id ?? item.id,
+        name: t.name || `Item #${item.id}`,
+        slot: idx,
+      };
+    });
+    res.json({ data: enriched });
+  } catch (err) {
+    console.error('GET /api/admin/giftcode-items/:id error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ======================== SITEMAP.XML (SEO) ========================
 
 /**
