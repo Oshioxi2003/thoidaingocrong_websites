@@ -827,7 +827,11 @@ app.get('/api/stats', async (req, res) => {
 // ======================== SPA CATCH-ALL (must be AFTER all API routes) ========================
 if (process.env.NODE_ENV === 'production') {
   const distDir = join(__dirname, '..', 'dist');
-  app.get('{*path}', (req, res) => {
+  app.get('{*path}', (req, res, next) => {
+    // Don't serve SPA for API, download, or media routes — let them 404 normally
+    if (req.path.startsWith('/api') || req.path.startsWith('/download') || req.path.startsWith('/media')) {
+      return next();
+    }
     res.sendFile(join(distDir, 'index.html'));
   });
 }
