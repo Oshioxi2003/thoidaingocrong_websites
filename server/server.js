@@ -33,15 +33,10 @@ app.use('/download', express.static(downloadDir, {
   },
 }));
 
-// Serve built frontend in production
+// Serve built frontend static files in production
 if (process.env.NODE_ENV === 'production') {
   const distDir = join(__dirname, '..', 'dist');
   app.use(express.static(distDir));
-  app.get('{*path}', (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/download')) {
-      res.sendFile(join(distDir, 'index.html'));
-    }
-  });
 }
 
 // Serve media files (uploaded images)
@@ -828,6 +823,14 @@ app.get('/api/stats', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
+
+// ======================== SPA CATCH-ALL (must be AFTER all API routes) ========================
+if (process.env.NODE_ENV === 'production') {
+  const distDir = join(__dirname, '..', 'dist');
+  app.get('{*path}', (req, res) => {
+    res.sendFile(join(distDir, 'index.html'));
+  });
+}
 
 // ======================== START ========================
 app.listen(PORT, () => {
