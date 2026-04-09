@@ -1,7 +1,7 @@
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
-import { Smartphone, Monitor, Apple, Download, ExternalLink, Shield, Zap, Star } from 'lucide-react';
+import { Smartphone, Monitor, Apple, Download, ExternalLink, Shield, Zap, Star, Coffee } from 'lucide-react';
 import bgDownload from '@/assets/bg-download.jpg';
 import { useSEO } from '@/lib/seo';
 
@@ -9,8 +9,9 @@ import { useSEO } from '@/lib/seo';
 const SITE_URL = 'https://thoidaingocrong.com';
 
 const IOS_TESTFLIGHT = 'https://testflight.apple.com/join/KSvswayS';
-const ANDROID_APK = '/download/ThoiDaiNgocRongv2.apk';
-const PC_RAR = '/download/ThoiDaiNgocRongv3.rar';
+const ANDROID_APK = '/download/ThoiDaiNgocRongv5.apk';
+const PC_RAR = '/download/ThoiDaiNgocRongv5.rar';
+const JAV_JAR = '/download/ThoiDaiNgocRong.jar';
 
 // QR code URLs (dùng API miễn phí)
 const qrApi = (url: string) =>
@@ -48,6 +49,17 @@ const platforms = [
     color: 'from-blue-500 to-indigo-700',
     glow: 'shadow-[0_0_30px_rgba(59,130,246,0.2)]',
     badge: 'RAR',
+    external: false,
+  },
+  {
+    icon: Coffee,
+    name: 'Java',
+    version: 'Java Phone',
+    size: '5 MB',
+    link: JAV_JAR,
+    color: 'from-orange-500 to-red-700',
+    glow: 'shadow-[0_0_30px_rgba(249,115,22,0.2)]',
+    badge: 'JAR',
     external: false,
   },
 ];
@@ -89,7 +101,7 @@ export default function DownloadPage() {
           </AnimatedSection>
 
           {/* Platform cards */}
-          <div className="mb-16 grid gap-8 md:grid-cols-3">
+          <div className="mb-16 grid gap-8 md:grid-cols-4">
             {platforms.map((p, i) => (
               <AnimatedSection key={p.name} delay={i * 0.15}>
                 <div className={`group relative overflow-hidden rounded-2xl border border-border bg-card p-8 text-center transition-all duration-500 hover:border-primary/40 hover:-translate-y-2 ${p.glow} hover:shadow-glow`}>
@@ -145,7 +157,7 @@ export default function DownloadPage() {
               <h3 className="mb-6 text-center font-display text-xl font-bold text-foreground">
                 📋 Hướng dẫn cài đặt
               </h3>
-              <div className="grid gap-6 md:grid-cols-3">
+              <div className="grid gap-6 md:grid-cols-4">
                 <div className="space-y-2">
                   <h4 className="font-semibold text-primary">iOS</h4>
                   <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
@@ -170,6 +182,15 @@ export default function DownloadPage() {
                     <li>Tải file RAR về máy</li>
                     <li>Giải nén bằng WinRAR / 7-Zip</li>
                     <li>Chạy file .exe trong thư mục</li>
+                    <li>Đăng nhập và chơi game</li>
+                  </ol>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-primary">Java</h4>
+                  <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
+                    <li>Tải file JAR về máy</li>
+                    <li>Cài Java trên điện thoại</li>
+                    <li>Mở file JAR bằng Java</li>
                     <li>Đăng nhập và chơi game</li>
                   </ol>
                 </div>

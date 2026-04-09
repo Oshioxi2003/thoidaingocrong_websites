@@ -21,6 +21,7 @@ import DepositPage from "@/pages/DepositPage";
 import NotFound from "./pages/NotFound.tsx";
 import ScrollToTop from "./components/ScrollToTop";
 import BackToTop from "./components/shared/BackToTop";
+import WelcomePopup from "./components/WelcomePopup";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => {
         <BrowserRouter>
           <ScrollToTop />
           <BackToTop />
+          <WelcomePopup />
           <Routes>
             {/* Auth page - no layout */}
             <Route path="/auth" element={<AuthPage />} />
