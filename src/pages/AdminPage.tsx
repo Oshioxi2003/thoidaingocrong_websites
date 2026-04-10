@@ -3,16 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  FileText, Users, Gift, ClipboardCheck, Package,
-  ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock
+  FileText, Users, Gift, ClipboardCheck, Package, Wallet,
+  ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock,
+  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
   fetchUsers, banUser,
   fetchGiftcodes, createGiftcode, deleteGiftcode, fetchItemOptions, fetchGiftcodeItems,
   fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
+  fetchAdminDeposits, fetchDepositStats, approveDeposit,
   type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate,
-  type ItemOption, type GiftcodeDetailItem
+  type ItemOption, type GiftcodeDetailItem, type DepositOrder, type DepositStats
 } from '@/lib/api';
 
 /* ============ SHARED PAGINATION ============ */
@@ -79,7 +81,7 @@ function PerPageSelector({ perPage, onChange }: { perPage: number; onChange: (n:
   );
 }
 
-type Tab = 'posts' | 'approval' | 'users' | 'giftcodes' | 'inventory';
+type Tab = 'posts' | 'approval' | 'users' | 'giftcodes' | 'inventory' | 'deposits';
 
 const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'posts', label: 'Bài viết', icon: FileText },
@@ -87,6 +89,7 @@ const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'users', label: 'Người dùng', icon: Users },
   { key: 'giftcodes', label: 'Giftcode', icon: Gift },
   { key: 'inventory', label: 'Hành trang', icon: Package },
+  { key: 'deposits', label: 'Dòng tiền', icon: Wallet },
 ];
 
 export default function AdminPage() {
@@ -151,6 +154,7 @@ export default function AdminPage() {
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'giftcodes' && <GiftcodesTab />}
           {activeTab === 'inventory' && <InventoryTab />}
+          {activeTab === 'deposits' && <DepositsTab />}
         </motion.div>
       </main>
     </div>
@@ -1681,6 +1685,224 @@ function AddItemModal({ playerId, playerName, onClose, onSuccess }: {
           )}
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+/* ============ DEPOSITS (DÒNG TIỀN) ============ */
+function DepositsTab() {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-deposits', search, statusFilter, page, perPage],
+    queryFn: () => fetchAdminDeposits({ search: search || undefined, status: statusFilter, page, limit: perPage }),
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['deposit-stats'],
+    queryFn: fetchDepositStats,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: number }) => approveDeposit(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['deposit-stats'] });
+    },
+  });
+
+  const deposits = data?.data || [];
+  const totalDeposits = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+
+  const handleSearch = (v: string) => { setSearch(v); setPage(1); };
+  const handleStatus = (v: string) => { setStatusFilter(v); setPage(1); };
+  const handlePerPage = (v: number) => { setPerPage(v); setPage(1); };
+
+  const formatVND = (n: number) => n.toLocaleString('vi-VN');
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="font-display text-2xl font-bold text-foreground">Quản lý dòng tiền</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Theo dõi tất cả giao dịch nạp tiền</p>
+      </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}
+            className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
+                <DollarSign size={20} className="text-emerald-500" />
+              </div>
+              <ArrowUpRight size={16} className="text-emerald-500" />
+            </div>
+            <p className="text-xs text-muted-foreground">Tổng doanh thu</p>
+            <p className="font-display text-xl font-bold text-foreground">{formatVND(stats.totalAmount)}đ</p>
+            <p className="mt-1 text-xs text-muted-foreground">{stats.totalDeposits} giao dịch thành công</p>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+            className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <TrendingUp size={20} className="text-primary" />
+              </div>
+              <ArrowUpRight size={16} className="text-primary" />
+            </div>
+            <p className="text-xs text-muted-foreground">Hôm nay</p>
+            <p className="font-display text-xl font-bold text-foreground">{formatVND(stats.todayAmount)}đ</p>
+            <p className="mt-1 text-xs text-muted-foreground">{stats.todayDeposits} giao dịch</p>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="rounded-2xl border border-yellow-500/30 bg-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10">
+                <Clock size={20} className="text-yellow-500" />
+              </div>
+              <span className="text-xs font-semibold text-yellow-500">{stats.pendingCount}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Đang chờ</p>
+            <p className="font-display text-xl font-bold text-foreground">{formatVND(stats.pendingAmount)}đ</p>
+            <p className="mt-1 text-xs text-muted-foreground">{stats.pendingCount} đơn chờ xử lý</p>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+            className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10">
+                <Wallet size={20} className="text-purple-400" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Tổng giao dịch</p>
+            <p className="font-display text-xl font-bold text-foreground">{totalDeposits}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Tất cả trạng thái</p>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+          <Search size={18} className="text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+            placeholder="Tìm theo username, mã chuyển khoản..."
+            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          {search && (
+            <button onClick={() => handleSearch('')} className="text-muted-foreground hover:text-foreground">
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {[{ key: 'all', label: 'Tất cả' }, { key: 'success', label: 'Thành công' }, { key: 'pending', label: 'Đang chờ' }].map(f => (
+            <button
+              key={f.key}
+              onClick={() => handleStatus(f.key)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+              }`}
+            >{f.label}</button>
+          ))}
+        </div>
+        <PerPageSelector perPage={perPage} onChange={handlePerPage} />
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="py-20 text-center text-muted-foreground">Đang tải...</div>
+      ) : deposits.length === 0 ? (
+        <div className="py-20 text-center text-muted-foreground">Không có giao dịch nào.</div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">ID</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">User</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Nội dung CK</th>
+                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Số tiền</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Trạng thái</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Thời gian</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Ref</th>
+                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deposits.map((d: DepositOrder) => (
+                  <tr key={d.id} className="border-b border-border/50 transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 text-muted-foreground">#{d.id}</td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-foreground">{d.username || '—'}</p>
+                        <p className="text-xs text-muted-foreground">UID: {d.user_id}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground max-w-[200px] truncate" title={d.transfer_code}>
+                      {d.transfer_code}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="font-display font-semibold text-foreground">{formatVND(d.amount)}đ</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
+                        d.status === 1
+                          ? 'bg-emerald-500/10 text-emerald-500'
+                          : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                      }`}>
+                        {d.status === 1 ? 'Thành công' : 'Đang chờ'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {new Date(d.created_at).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground max-w-[120px] truncate" title={d.refNo}>
+                      {d.refNo || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {d.status === 0 && (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => { if (confirm(`Duyệt đơn #${d.id} — Cộng ${formatVND(d.amount)} cash cho ${d.username}?`)) approveMutation.mutate({ id: d.id, status: 1 }); }}
+                            disabled={approveMutation.isPending}
+                            className="rounded-lg p-1.5 text-emerald-500 transition-colors hover:bg-emerald-500/10"
+                            title="Duyệt (cộng cash)"
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                          <button
+                            onClick={() => { if (confirm(`Từ chối đơn #${d.id}?`)) approveMutation.mutate({ id: d.id, status: -1 }); }}
+                            disabled={approveMutation.isPending}
+                            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            title="Từ chối (xóa đơn)"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </div>
+                      )}
+                      {d.status === 1 && (
+                        <span className="text-xs text-muted-foreground">Đã xử lý</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} totalPages={totalPages} total={totalDeposits} perPage={perPage} onPageChange={setPage} label="giao dịch" />
+        </>
+      )}
     </div>
   );
 }

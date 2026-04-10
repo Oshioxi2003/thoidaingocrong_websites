@@ -283,6 +283,41 @@ export async function fetchDepositHistory(userId: number, page = 1): Promise<Pag
   return request<PaginatedResponse<DepositOrder>>(`/deposit/history?user_id=${userId}&page=${page}`);
 }
 
+// Admin deposit management
+export interface DepositStats {
+  totalDeposits: number;
+  totalAmount: number;
+  pendingCount: number;
+  pendingAmount: number;
+  todayDeposits: number;
+  todayAmount: number;
+}
+
+export async function fetchAdminDeposits(params?: {
+  search?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<DepositOrder>> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.status && params.status !== 'all') q.set('status', params.status);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.limit) q.set('limit', String(params.limit));
+  return request<PaginatedResponse<DepositOrder>>(`/admin/deposits?${q.toString()}`);
+}
+
+export async function fetchDepositStats(): Promise<DepositStats> {
+  return request<DepositStats>('/admin/deposits/stats');
+}
+
+export async function approveDeposit(id: number, status: number): Promise<{ message: string }> {
+  return request<{ message: string }>(`/admin/deposits/${id}/approve`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+}
+
 // ============ Admin — Player Inventory API ============
 
 export interface Player {

@@ -941,6 +941,86 @@ app.get('/api/deposit/history', async (req, res) => {
   }
 });
 
+// ======================== ADMIN — QUẢN LÝ DÒNG TIỀN ========================
+
+// GET /api/admin/deposits — Lấy tất cả giao dịch nạp (admin)
+app.get('/api/admin/deposits', async (req, res) => {
+  try {
+    const { search, status, page = 1, limit = 20 } = req.query;
+    let sql = 'SELECT * FROM payments WHERE transfer_code IS NOT NULL';
+    const params = [];
+
+    if (search) {
+      sql += ' AND (username LIKE ? OR transfer_code LIKE ? OR refNo LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (status === 'success') {
+      sql += ' AND status = 1';
+    } else if (status === 'pending') {
+      sql += ' AND status = 0';
+    }
+
+    sql += ' ORDER BY created_at DESC';
+
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
+    const [countRows] = await pool.query(countSql, params);
+    const total = countRows[0].total;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(Number(limit), offset);
+
+    const [rows] = await pool.query(sql, params);
+    res.json({ data: rows, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    console.error('GET /api/admin/deposits error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/deposits/stats — Thống kê dòng tiền
+app.get('/api/admin/deposits/stats', async (req, res) => {
+  try {
+    const [[{ totalDeposits }]] = await pool.query("SELECT COUNT(*) as totalDeposits FROM payments WHERE transfer_code IS NOT NULL AND status = 1");
+    const [[{ totalAmount }]] = await pool.query("SELECT COALESCE(SUM(amount), 0) as totalAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 1");
+    const [[{ pendingCount }]] = await pool.query("SELECT COUNT(*) as pendingCount FROM payments WHERE transfer_code IS NOT NULL AND status = 0");
+    const [[{ pendingAmount }]] = await pool.query("SELECT COALESCE(SUM(amount), 0) as pendingAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 0");
+    const [[{ todayDeposits }]] = await pool.query("SELECT COUNT(*) as todayDeposits FROM payments WHERE transfer_code IS NOT NULL AND status = 1 AND DATE(created_at) = CURDATE()");
+    const [[{ todayAmount }]] = await pool.query("SELECT COALESCE(SUM(amount), 0) as todayAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 1 AND DATE(created_at) = CURDATE()");
+    res.json({ totalDeposits, totalAmount, pendingCount, pendingAmount, todayDeposits, todayAmount });
+  } catch (err) {
+    console.error('GET /api/admin/deposits/stats error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// PUT /api/admin/deposits/:id/approve — Admin duyệt đơn nạp thủ công
+app.put('/api/admin/deposits/:id/approve', async (req, res) => {
+  try {
+    const { status } = req.body; // 1 = thành công, -1 = từ chối
+    const [deposits] = await pool.query('SELECT * FROM payments WHERE id = ?', [req.params.id]);
+    if (deposits.length === 0) return res.status(404).json({ error: 'Không tìm thấy đơn nạp' });
+
+    const deposit = deposits[0];
+
+    if (status === 1 && deposit.status !== 1) {
+      // Duyệt: cộng cash
+      await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [`ADMIN_APPROVE_${Date.now()}`, deposit.id]);
+      await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.user_id]);
+      res.json({ message: `Đã duyệt và cộng ${deposit.amount.toLocaleString()} cash cho user #${deposit.user_id}` });
+    } else if (status === -1) {
+      // Từ chối: xóa đơn
+      await pool.query('DELETE FROM payments WHERE id = ?', [deposit.id]);
+      res.json({ message: 'Đã từ chối và xóa đơn nạp' });
+    } else {
+      res.json({ message: 'Đơn nạp đã được xử lý trước đó' });
+    }
+  } catch (err) {
+    console.error('PUT /api/admin/deposits/:id/approve error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ======================== ADMIN — PLAYER INVENTORY ========================
 
 // Cache item_template data for icon_id + name lookup
