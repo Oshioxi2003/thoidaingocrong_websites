@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
-import { Gift, Check, X, Copy, LogIn, User, Gamepad2 } from 'lucide-react';
+import { Gift, Check, X, Copy, LogIn, User, Gamepad2, Wrench } from 'lucide-react';
 import bgGiftcode from '@/assets/bg-giftcode.jpg';
 import { fetchGiftcodes, redeemGiftcode, type Giftcode } from '@/lib/api';
 import { useSEO } from '@/lib/seo';
@@ -109,23 +109,38 @@ export default function GiftcodePage() {
           </AnimatedSection>
         )}
 
+        {/* Thông báo bảo trì */}
+        <AnimatedSection className="mx-auto mb-6 max-w-md">
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 text-center backdrop-blur-sm">
+            <motion.div
+              animate={{ rotate: [0, -15, 15, -15, 0] }}
+              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+              className="inline-block"
+            >
+              <Wrench size={32} className="mx-auto mb-3 text-amber-400" />
+            </motion.div>
+            <p className="font-display text-base font-semibold text-amber-300">🔧 Đang bảo trì</p>
+            <p className="mt-1 text-sm text-amber-300/80">Chức năng đổi Giftcode đang bảo trì. Vui lòng quay lại sau!</p>
+          </div>
+        </AnimatedSection>
+
         {/* Input Form */}
         <AnimatedSection className="mx-auto mb-16 max-w-md">
-          <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-8">
+          <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-8 opacity-50 pointer-events-none">
             <Gift size={40} className="mx-auto mb-4 text-primary" />
             <input
               value={code}
               onChange={e => setCode(e.target.value)}
               placeholder="Nhập giftcode tại đây..."
               className="w-full rounded-xl border border-border bg-background py-3 px-4 text-center font-mono text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              disabled={!user}
+              disabled
             />
             <button
               type="submit"
-              disabled={redeemMutation.isPending || !user}
+              disabled
               className="mt-4 w-full rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {redeemMutation.isPending ? 'Đang xử lý...' : !user ? 'Đăng nhập để đổi mã' : 'Đổi mã'}
+              Đang bảo trì
             </button>
 
             {/* Lưu ý */}
@@ -133,7 +148,8 @@ export default function GiftcodePage() {
               <Gamepad2 size={16} className="mt-0.5 shrink-0 text-primary" />
               <p className="text-xs text-muted-foreground">
                 Bạn cần <strong className="text-foreground">tạo nhân vật trong game</strong> trước khi nhập mã. 
-                Phần thưởng sẽ được gửi vào hộp thư nhân vật khi bạn đăng nhập game.
+                Vật phẩm sẽ được thêm trực tiếp vào <strong className="text-foreground">hành trang</strong> nhân vật. 
+                Hãy đảm bảo hành trang còn đủ ô trống!
               </p>
             </div>
 

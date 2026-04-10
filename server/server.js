@@ -540,8 +540,12 @@ app.post('/api/giftcodes', async (req, res) => {
 });
 
 // POST /api/giftcodes/redeem — Đổi giftcode (yêu cầu đã tạo nhân vật)
+// Flow: check player.giftcode (đã nhập chưa) → check items_bag (đủ ô trống) → đẩy vào items_bag + ghi giftcode
 app.post('/api/giftcodes/redeem', async (req, res) => {
   try {
+    // 🔧 BẢO TRÌ: Tạm tắt chức năng đổi giftcode
+    return res.status(503).json({ error: 'Chức năng đổi Giftcode đang bảo trì. Vui lòng quay lại sau!' });
+
     const { code, user_id } = req.body;
     if (!code) {
       return res.status(400).json({ error: 'Vui lòng nhập mã giftcode' });
@@ -551,7 +555,7 @@ app.post('/api/giftcodes/redeem', async (req, res) => {
     }
 
     // Kiểm tra player đã tạo chưa
-    const [players] = await pool.query('SELECT id, name, giftcode, pending_gift_items FROM player WHERE account_id = ?', [user_id]);
+    const [players] = await pool.query('SELECT id, name, giftcode, items_bag FROM player WHERE account_id = ?', [user_id]);
     if (players.length === 0) {
       return res.status(400).json({ error: 'Bạn chưa tạo nhân vật trong game. Vui lòng vào game tạo nhân vật trước!' });
     }
@@ -567,7 +571,7 @@ app.post('/api/giftcodes/redeem', async (req, res) => {
     }
     const gc = rows[0];
 
-    // Kiểm tra player đã dùng giftcode này chưa
+    // 1) Kiểm tra player đã dùng giftcode này chưa (bảng player.giftcode)
     let usedCodes = [];
     try {
       usedCodes = JSON.parse(player.giftcode || '[]');
@@ -577,35 +581,77 @@ app.post('/api/giftcodes/redeem', async (req, res) => {
       return res.status(400).json({ error: 'Bạn đã sử dụng mã này rồi!' });
     }
 
-    // Thêm code vào danh sách đã dùng
-    usedCodes.push(code);
-
-    // Thêm items vào pending_gift_items để game server phát thưởng
-    let pendingItems = [];
-    try {
-      pendingItems = JSON.parse(player.pending_gift_items || '[]');
-    } catch { pendingItems = []; }
-
+    // Parse reward items từ giftcode detail
     let rewardItems = [];
     try {
       rewardItems = JSON.parse(gc.detail || '[]');
     } catch { rewardItems = []; }
 
-    pendingItems.push(...rewardItems);
+    if (rewardItems.length === 0) {
+      return res.status(400).json({ error: 'Giftcode không có vật phẩm nào!' });
+    }
 
-    // Cập nhật player
+    // 2) Kiểm tra items_bag có đủ ô trống không
+    let rawItems = [];
+    try { rawItems = JSON.parse(player.items_bag || '[]'); } catch { rawItems = []; }
+
+    // Đếm số ô trống (item_id = -1) trong items_bag
+    let emptySlots = 0;
+    const emptySlotIndices = [];
+    for (let i = 0; i < rawItems.length; i++) {
+      try {
+        const parsed = JSON.parse(rawItems[i]);
+        if (parsed[0] === -1) {
+          emptySlots++;
+          emptySlotIndices.push(i);
+        }
+      } catch { continue; }
+    }
+
+    // Số item cần thêm
+    const itemsNeeded = rewardItems.length;
+
+    if (emptySlots < itemsNeeded) {
+      return res.status(400).json({
+        error: `Hành trang không đủ ô trống! Cần ${itemsNeeded} ô, hiện còn ${emptySlots} ô trống. Vui lòng vào game dọn hành trang trước.`,
+      });
+    }
+
+    // 3) Đẩy items vào items_bag
+    const timestamp = Date.now();
+    let slotIdx = 0; // index trong emptySlotIndices
+    for (const reward of rewardItems) {
+      // Chuyển options từ format giftcode [{id, param}] sang format NRO items_bag
+      const optionsStr = JSON.stringify(reward.options || []);
+      const newItem = `[${reward.id},${reward.quantity || 1},${JSON.stringify(optionsStr)},${timestamp}]`;
+
+      if (slotIdx < emptySlotIndices.length) {
+        // Điền vào ô trống
+        rawItems[emptySlotIndices[slotIdx]] = newItem;
+        slotIdx++;
+      } else {
+        // Thêm vào cuối (fallback, không nên xảy ra vì đã check ở trên)
+        rawItems.push(newItem);
+      }
+    }
+
+    // 4) Ghi giftcode đã dùng để tránh nhập lại
+    usedCodes.push(code);
+
+    // Cập nhật player: items_bag + giftcode
     await pool.query(
-      'UPDATE player SET giftcode = ?, pending_gift_items = ? WHERE id = ?',
-      [JSON.stringify(usedCodes), JSON.stringify(pendingItems), player.id]
+      'UPDATE player SET giftcode = ?, items_bag = ? WHERE id = ?',
+      [JSON.stringify(usedCodes), JSON.stringify(rawItems), player.id]
     );
 
-    // Giảm count_left
+    // Giảm count_left của giftcode
     await pool.query('UPDATE giftcode SET count_left = count_left - 1 WHERE id = ?', [gc.id]);
 
     res.json({
-      message: `Đổi mã thành công! Phần thưởng đã được gửi cho nhân vật "${player.name}". Vào game để nhận!`,
+      message: `Đổi mã thành công! ${itemsNeeded} vật phẩm đã được thêm vào hành trang nhân vật "${player.name}".`,
       reward: gc.detail,
       player_name: player.name,
+      items_added: itemsNeeded,
     });
   } catch (err) {
     console.error('POST /api/giftcodes/redeem error:', err);
