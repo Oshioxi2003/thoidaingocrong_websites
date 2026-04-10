@@ -763,6 +763,27 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// GET /api/auth/me — Lấy thông tin user mới nhất (refresh cash, vàng, vip)
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    if (!user_id) {
+      return res.status(400).json({ error: 'Thiếu user_id' });
+    }
+    const [rows] = await pool.query(
+      'SELECT id, username, email, is_admin, cash, vang, vip FROM account WHERE id = ?',
+      [Number(user_id)]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+    }
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('GET /api/auth/me error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ======================== DEPOSIT (NẠP ATM) ========================
 
 const BANK_CONFIG = {

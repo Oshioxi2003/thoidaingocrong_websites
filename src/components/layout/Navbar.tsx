@@ -45,6 +45,22 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
     }
   }, [location]); // re-check on route change (e.g. after login redirect)
 
+  // Refresh user stats (cash, vàng, vip) từ server khi mở dropdown
+  useEffect(() => {
+    if (!dropdownOpen || !user) return;
+    fetch(`/api/auth/me?user_id=${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          const updated = { ...user, ...data.user };
+          setUser(updated);
+          localStorage.setItem('user', JSON.stringify(updated));
+        }
+      })
+      .catch(() => { /* ignore */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dropdownOpen]);
+
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
