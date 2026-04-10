@@ -769,7 +769,7 @@ const BANK_CONFIG = {
   bank: process.env.BANK_NAME || 'ACB',
   accountName: process.env.BANK_ACCOUNT_NAME || 'DINH THI NGOC BICH',
   accountNumber: process.env.BANK_ACCOUNT_NUMBER || '48932127',
-  token: process.env.BANK_API_TOKEN || '17e95e99df5f536a692653ab4c679237',
+  token: process.env.BANK_API_TOKEN || '038f4e174f40df529acb1903b2d56423',
 };
 
 // POST /api/deposit/create — Tạo đơn nạp mới
@@ -838,19 +838,30 @@ app.post('/api/deposit/check', async (req, res) => {
       return res.json({ status: 'success', message: 'Đơn nạp đã được xử lý trước đó' });
     }
 
-    // Gọi API sieuthicode.net v1
-    const apiUrl = `https://api.sieuthicode.net/v1/banking/bank/${BANK_CONFIG.bank.toLowerCase()}/${BANK_CONFIG.accountNumber}/${BANK_CONFIG.token}`;
-    const apiRes = await fetch(apiUrl);
-    const apiData = await apiRes.json();
+    // Gọi API sieuthicode.net (historyapi)
+    const apiUrl = `https://api.sieuthicode.net/historyapi${BANK_CONFIG.bank.toLowerCase()}/${BANK_CONFIG.token}`;
+    let apiData;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const apiRes = await fetch(apiUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      apiData = await apiRes.json();
+    } catch (fetchErr) {
+      console.error('Fetch sieuthicode API error:', fetchErr.message);
+      return res.json({ status: 'pending', message: 'Không thể kết nối đến hệ thống thanh toán, vui lòng thử lại sau' });
+    }
 
     if (!apiData || !apiData.data || !Array.isArray(apiData.data)) {
+      console.error('sieuthicode API returned unexpected data:', JSON.stringify(apiData).substring(0, 200));
       return res.json({ status: 'pending', message: 'Chưa tìm thấy giao dịch, vui lòng thử lại' });
     }
 
-    // Tìm giao dịch khớp transfer_code và amount
+    // Tìm giao dịch khớp transfer_code và amount (chỉ xét giao dịch IN)
     const matched = apiData.data.find(tx => {
-      const content = (tx.description || tx.content || tx.memo || '').toUpperCase();
-      const txAmount = Number(tx.amount || tx.money || 0);
+      if (tx.type && tx.type !== 'IN') return false; // Chỉ xét giao dịch nhận tiền
+      const content = (tx.description || '').toUpperCase();
+      const txAmount = Number(tx.amount || 0);
       return content.includes(deposit.transfer_code.toUpperCase()) && txAmount >= deposit.amount;
     });
 
@@ -859,7 +870,7 @@ app.post('/api/deposit/check', async (req, res) => {
     }
 
     // Cập nhật đơn nạp thành công
-    const refNo = matched.refNo || matched.transactionNumber || matched.id || '';
+    const refNo = matched.transactionNumber || matched.refNo || matched.id || '';
     await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
 
     // Cộng cash cho user (1 VND = 1 cash)

@@ -62,6 +62,26 @@ export default function DepositPage() {
     enabled: !!user,
   });
 
+  // Auto-resume: nếu có đơn pending (status=0) khi reload trang → tự động vào step 2
+  const [resumeChecked, setResumeChecked] = useState(false);
+  useEffect(() => {
+    if (!historyData || !user || currentDeposit || resumeChecked) return;
+    setResumeChecked(true);
+    const pendingDeposit = historyData.data.find(
+      (d) => d.status === 0 && new Date(d.created_at).getTime() > Date.now() - 30 * 60 * 1000
+    );
+    if (pendingDeposit) {
+      // Gọi create để lấy đầy đủ bank info (server trả lại đơn pending nếu có)
+      createDeposit({ user_id: user.id, username: user.username, amount: pendingDeposit.amount })
+        .then((data) => {
+          setCurrentDeposit(data);
+          setAmount(pendingDeposit.amount);
+          setStep(2);
+        })
+        .catch(() => { /* ignore - user sẽ tạo đơn mới */ });
+    }
+  }, [historyData, user, currentDeposit, resumeChecked]);
+
   // Create deposit mutation
   const createMutation = useMutation({
     mutationFn: (amt: number) => createDeposit({ user_id: user!.id, username: user!.username, amount: amt }),
@@ -91,19 +111,29 @@ export default function DepositPage() {
       }
     },
     onError: (err: Error) => {
+      setAutoChecking(false);
       setCheckResult({ status: 'error', message: err.message });
     },
   });
 
-  // Auto-check every 5 seconds
+  const [autoCheckCount, setAutoCheckCount] = useState(0);
+  const MAX_AUTO_CHECK = 60; // Tối đa ~5 phút (60 x 5s)
+
+  // Auto-check every 5 seconds (dừng khi thành công, lỗi, hoặc quá 60 lần)
   useEffect(() => {
     if (!autoChecking || !currentDeposit) return;
+    if (autoCheckCount >= MAX_AUTO_CHECK) {
+      setAutoChecking(false);
+      setCheckResult({ status: 'error', message: 'Đã hết thời gian kiểm tra tự động. Vui lòng bấm kiểm tra lại.' });
+      return;
+    }
     const interval = setInterval(() => {
+      setAutoCheckCount(prev => prev + 1);
       checkMutation.mutate(currentDeposit.deposit.id);
     }, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoChecking, currentDeposit]);
+  }, [autoChecking, currentDeposit, autoCheckCount]);
 
   const handleSelectAmount = (val: number) => {
     setAmount(val);
@@ -128,6 +158,7 @@ export default function DepositPage() {
   const handleStartCheck = () => {
     if (!currentDeposit) return;
     setAutoChecking(true);
+    setAutoCheckCount(0);
     setCheckResult(null);
     checkMutation.mutate(currentDeposit.deposit.id);
   };
