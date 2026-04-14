@@ -5,13 +5,8 @@ import { Smartphone, Monitor, Apple, Download, ExternalLink, Shield, Zap, Star, 
 import bgDownload from '@/assets/bg-download.jpg';
 import { useSEO } from '@/lib/seo';
 
-// ⚠️ Khi publish ra public, đổi URL này thành domain thật của bạn
-const SITE_URL = 'https://thoidaingocrong.com';
-
+const GOOGLE_DRIVE = 'https://drive.google.com/drive/folders/1RPsdAu7aQXTR5bA_RUnsqaE2nOO1x7M-?usp=sharing';
 const IOS_TESTFLIGHT = 'https://testflight.apple.com/join/KSvswayS';
-const ANDROID_APK = '/download/ThoiDaiNgocRongv5.apk';
-const PC_RAR = '/download/ThoiDaiNgocRongv5.rar';
-const JAV_JAR = '/download/ThoiDaiNgocRong.jar';
 
 // QR code URLs (dùng API miễn phí)
 const qrApi = (url: string) =>
@@ -34,33 +29,33 @@ const platforms = [
     name: 'Android',
     version: 'Android 8.0+',
     size: '61.8 MB',
-    link: ANDROID_APK,
+    link: GOOGLE_DRIVE,
     color: 'from-green-500 to-emerald-700',
     glow: 'shadow-[0_0_30px_rgba(34,197,94,0.2)]',
     badge: 'APK',
-    external: false,
+    external: true,
   },
   {
     icon: Monitor,
     name: 'PC',
     version: 'Windows 10+',
     size: '56.4 MB',
-    link: PC_RAR,
+    link: GOOGLE_DRIVE,
     color: 'from-blue-500 to-indigo-700',
     glow: 'shadow-[0_0_30px_rgba(59,130,246,0.2)]',
     badge: 'RAR',
-    external: false,
+    external: true,
   },
   {
     icon: Coffee,
     name: 'Java',
     version: 'Java Phone',
     size: '5 MB',
-    link: JAV_JAR,
+    link: GOOGLE_DRIVE,
     color: 'from-orange-500 to-red-700',
     glow: 'shadow-[0_0_30px_rgba(249,115,22,0.2)]',
     badge: 'JAR',
-    external: false,
+    external: true,
   },
 ];
 
@@ -134,7 +129,7 @@ export default function DownloadPage() {
                     download={!p.external ? true : undefined}
                     className={`mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r ${p.color} px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl`}
                   >
-                    {p.external ? (
+                    {p.name === 'iOS' ? (
                       <>
                         <ExternalLink size={18} />
                         Mở TestFlight
@@ -218,18 +213,18 @@ export default function DownloadPage() {
                   <span className="text-sm font-semibold text-foreground">iOS (TestFlight)</span>
                 </div>
               </div>
-              {/* Android QR */}
+              {/* Google Drive QR */}
               <div className="flex flex-col items-center rounded-2xl border border-border bg-card/80 p-6 backdrop-blur-md">
                 <img
-                  src={qrApi(`${SITE_URL}${ANDROID_APK}`)}
-                  alt="QR Android APK"
+                  src={qrApi(GOOGLE_DRIVE)}
+                  alt="QR Google Drive"
                   width={160}
                   height={160}
                   className="rounded-lg bg-white p-2"
                 />
                 <div className="mt-3 flex items-center gap-2">
                   <Smartphone size={18} className="text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">Android (APK)</span>
+                  <span className="text-sm font-semibold text-foreground">Tải Game (Google Drive)</span>
                 </div>
               </div>
             </div>

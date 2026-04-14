@@ -4,10 +4,8 @@ import { X, Smartphone, Monitor, Apple, Coffee, Download, ExternalLink, Users, M
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from '@/assets/logo.png';
 
+const GOOGLE_DRIVE = 'https://drive.google.com/drive/folders/1RPsdAu7aQXTR5bA_RUnsqaE2nOO1x7M-?usp=sharing';
 const IOS_TESTFLIGHT = 'https://testflight.apple.com/join/KSvswayS';
-const ANDROID_APK = '/download/ThoiDaiNgocRongv5.apk';
-const PC_RAR = '/download/ThoiDaiNgocRongv5.rar';
-const JAV_JAR = '/download/ThoiDaiNgocRong.jar';
 
 const downloads = [
   {
@@ -22,25 +20,25 @@ const downloads = [
     icon: Smartphone,
     name: 'Android',
     desc: 'APK 61.8 MB',
-    link: ANDROID_APK,
+    link: GOOGLE_DRIVE,
     gradient: 'from-green-500 to-emerald-700',
-    external: false,
+    external: true,
   },
   {
     icon: Monitor,
     name: 'PC',
     desc: 'RAR 56.4 MB',
-    link: PC_RAR,
+    link: GOOGLE_DRIVE,
     gradient: 'from-blue-500 to-indigo-700',
-    external: false,
+    external: true,
   },
   {
     icon: Coffee,
     name: 'Java',
     desc: 'JAR 5 MB',
-    link: JAV_JAR,
+    link: GOOGLE_DRIVE,
     gradient: 'from-orange-500 to-red-700',
-    external: false,
+    external: true,
   },
 ];
 
