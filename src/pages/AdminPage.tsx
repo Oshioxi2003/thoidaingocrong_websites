@@ -1,18 +1,18 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Users, Gift, ClipboardCheck, Package, Wallet,
   ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock,
-  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight
+  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert
 } from 'lucide-react';
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
   fetchUsers, banUser,
   fetchGiftcodes, createGiftcode, deleteGiftcode, fetchItemOptions, fetchGiftcodeItems,
   fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
-  fetchAdminDeposits, fetchDepositStats, approveDeposit,
+  fetchAdminDeposits, fetchDepositStats, approveDeposit, getCurrentUser,
   type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate,
   type ItemOption, type GiftcodeDetailItem, type DepositOrder, type DepositStats
 } from '@/lib/api';
@@ -95,6 +95,55 @@ const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('posts');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const navigate = useNavigate();
+
+  // Kiểm tra quyền admin khi vào trang
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const user = getCurrentUser();
+      if (!user || !user.id) {
+        navigate('/auth', { replace: true });
+        return;
+      }
+      if (user.is_admin !== 1) {
+        navigate('/', { replace: true });
+        return;
+      }
+      // Xác thực lại từ server để tránh giả mạo localStorage
+      try {
+        const res = await fetch(`/api/auth/me?user_id=${user.id}`);
+        const data = await res.json();
+        if (!res.ok || !data.user || data.user.is_admin !== 1) {
+          navigate('/', { replace: true });
+          return;
+        }
+        setIsAuthorized(true);
+      } catch {
+        navigate('/', { replace: true });
+        return;
+      }
+      setAuthChecked(true);
+    };
+    checkAdmin();
+  }, [navigate]);
+
+  // Loading state khi đang kiểm tra quyền
+  if (!authChecked || !isAuthorized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <motion.div
+            className="mx-auto mb-4 h-10 w-10 rounded-full border-3 border-primary/30 border-t-primary"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          />
+          <p className="text-sm text-muted-foreground">Đang xác thực quyền truy cập...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background">

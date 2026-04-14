@@ -52,10 +52,28 @@ export interface PaginatedResponse<T> {
 
 const API_BASE = '/api';
 
+// Lấy user hiện tại từ localStorage
+export function getCurrentUser(): { id: number; username: string; email: string; is_admin: number; cash: number; vang: number; vip: number } | null {
+  try {
+    const stored = localStorage.getItem('user');
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return null;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const user = getCurrentUser();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string> || {}),
+  };
+  // Gửi x-user-id header để server xác thực admin
+  if (user?.id) {
+    headers['x-user-id'] = String(user.id);
+  }
   const res = await fetch(`${API_BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Lỗi không xác định' }));

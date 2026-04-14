@@ -19,6 +19,33 @@ const PORT = parseInt(process.env.SERVER_PORT || '3001');
 app.use(cors());
 app.use(express.json());
 
+// ======================== ADMIN AUTH MIDDLEWARE ========================
+// Middleware kiểm tra quyền admin từ header x-user-id
+// Xác thực trực tiếp từ database để tránh giả mạo localStorage
+async function requireAdmin(req, res, next) {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập' });
+    }
+    const [rows] = await pool.query(
+      'SELECT id, is_admin FROM account WHERE id = ?',
+      [Number(userId)]
+    );
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Tài khoản không tồn tại' });
+    }
+    if (rows[0].is_admin !== 1) {
+      return res.status(403).json({ error: 'Bạn không có quyền truy cập chức năng này' });
+    }
+    req.adminUser = rows[0];
+    next();
+  } catch (err) {
+    console.error('requireAdmin error:', err);
+    res.status(500).json({ error: 'Lỗi xác thực' });
+  }
+}
+
 // Serve download files (APK, RAR, etc.) with proper headers
 const downloadDir = join(__dirname, '..', 'download');
 app.use('/download', express.static(downloadDir, {
@@ -211,7 +238,7 @@ app.get('/api/posts', async (req, res) => {
 });
 
 // GET /api/posts/pending — Lấy bài viết chờ duyệt (admin)
-app.get('/api/posts/pending', async (req, res) => {
+app.get('/api/posts/pending', requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT * FROM posts WHERE status = 'pending' ORDER BY created_at DESC");
     res.json({ data: rows });
@@ -347,7 +374,7 @@ app.put('/api/posts/:id', async (req, res) => {
 });
 
 // PUT /api/posts/:id/approve — Duyệt hoặc từ chối bài viết (admin)
-app.put('/api/posts/:id/approve', async (req, res) => {
+app.put('/api/posts/:id/approve', requireAdmin, async (req, res) => {
   try {
     const { status } = req.body; // 'approved' hoặc 'rejected'
     if (!['approved', 'rejected'].includes(status)) {
@@ -366,7 +393,7 @@ app.put('/api/posts/:id/approve', async (req, res) => {
 });
 
 // DELETE /api/posts/:id — Xóa bài viết
-app.delete('/api/posts/:id', async (req, res) => {
+app.delete('/api/posts/:id', requireAdmin, async (req, res) => {
   try {
     const [result] = await pool.query('DELETE FROM posts WHERE id = ?', [req.params.id]);
     if (result.affectedRows === 0) {
@@ -436,7 +463,7 @@ app.delete('/api/comments/:id', async (req, res) => {
 // ======================== USERS (account) ========================
 
 // GET /api/users — Lấy danh sách user (ẩn password)
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', requireAdmin, async (req, res) => {
   try {
     const { search, role, status, page = 1, limit = 20 } = req.query;
     let sql = 'SELECT id, username, email, create_time, ban, is_admin, cash, vang, vip, ip_address, active, last_time_login, last_time_logout FROM account WHERE 1=1';
@@ -481,7 +508,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // PUT /api/users/:id/ban — Ban/unban user
-app.put('/api/users/:id/ban', async (req, res) => {
+app.put('/api/users/:id/ban', requireAdmin, async (req, res) => {
   try {
     const { ban } = req.body; // 0 hoặc 1
     await pool.query('UPDATE account SET ban = ? WHERE id = ?', [ban ? 1 : 0, req.params.id]);
@@ -495,7 +522,7 @@ app.put('/api/users/:id/ban', async (req, res) => {
 // ======================== GIFTCODES ========================
 
 // GET /api/giftcodes — Lấy danh sách giftcode
-app.get('/api/giftcodes', async (req, res) => {
+app.get('/api/giftcodes', requireAdmin, async (req, res) => {
   try {
     const { search, status } = req.query;
     let sql = 'SELECT * FROM giftcode WHERE 1=1';
@@ -521,7 +548,7 @@ app.get('/api/giftcodes', async (req, res) => {
 });
 
 // POST /api/giftcodes — Tạo giftcode mới
-app.post('/api/giftcodes', async (req, res) => {
+app.post('/api/giftcodes', requireAdmin, async (req, res) => {
   try {
     const { code, count_left = 100, detail = '[]', type = 0, expired = '2030-01-01 00:00:00' } = req.body;
     if (!code) {
@@ -660,7 +687,7 @@ app.post('/api/giftcodes/redeem', async (req, res) => {
 });
 
 // DELETE /api/giftcodes/:id — Xóa giftcode
-app.delete('/api/giftcodes/:id', async (req, res) => {
+app.delete('/api/giftcodes/:id', requireAdmin, async (req, res) => {
   try {
     const [result] = await pool.query('DELETE FROM giftcode WHERE id = ?', [req.params.id]);
     if (result.affectedRows === 0) {
@@ -1006,7 +1033,7 @@ app.get('/api/deposit/history', async (req, res) => {
 // ======================== ADMIN — QUẢN LÝ DÒNG TIỀN ========================
 
 // GET /api/admin/deposits — Lấy tất cả giao dịch nạp (admin)
-app.get('/api/admin/deposits', async (req, res) => {
+app.get('/api/admin/deposits', requireAdmin, async (req, res) => {
   try {
     const { search, status, page = 1, limit = 20 } = req.query;
     let sql = 'SELECT * FROM payments WHERE transfer_code IS NOT NULL';
@@ -1041,7 +1068,7 @@ app.get('/api/admin/deposits', async (req, res) => {
 });
 
 // GET /api/admin/deposits/stats — Thống kê dòng tiền
-app.get('/api/admin/deposits/stats', async (req, res) => {
+app.get('/api/admin/deposits/stats', requireAdmin, async (req, res) => {
   try {
     const [[{ totalDeposits }]] = await pool.query("SELECT COUNT(*) as totalDeposits FROM payments WHERE transfer_code IS NOT NULL AND status = 1");
     const [[{ totalAmount }]] = await pool.query("SELECT COALESCE(SUM(amount), 0) as totalAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 1");
@@ -1057,7 +1084,7 @@ app.get('/api/admin/deposits/stats', async (req, res) => {
 });
 
 // PUT /api/admin/deposits/:id/approve — Admin duyệt đơn nạp thủ công
-app.put('/api/admin/deposits/:id/approve', async (req, res) => {
+app.put('/api/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
   try {
     const { status } = req.body; // 1 = thành công, -1 = từ chối
     const [deposits] = await pool.query('SELECT * FROM payments WHERE id = ?', [req.params.id]);
@@ -1133,7 +1160,7 @@ async function parseNROItems(itemsBagJson) {
 }
 
 // GET /api/admin/players — Tìm kiếm nhân vật theo tên
-app.get('/api/admin/players', async (req, res) => {
+app.get('/api/admin/players', requireAdmin, async (req, res) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
     let sql = 'SELECT id, name, account_id, head FROM player WHERE 1=1';
@@ -1163,7 +1190,7 @@ app.get('/api/admin/players', async (req, res) => {
 });
 
 // GET /api/admin/players/:id/inventory — Lấy hành trang của nhân vật
-app.get('/api/admin/players/:id/inventory', async (req, res) => {
+app.get('/api/admin/players/:id/inventory', requireAdmin, async (req, res) => {
   try {
     const playerId = req.params.id;
     const [rows] = await pool.query(
@@ -1183,7 +1210,7 @@ app.get('/api/admin/players/:id/inventory', async (req, res) => {
 });
 
 // POST /api/admin/players/:id/inventory — Thêm vật phẩm vào hành trang
-app.post('/api/admin/players/:id/inventory', async (req, res) => {
+app.post('/api/admin/players/:id/inventory', requireAdmin, async (req, res) => {
   try {
     const playerId = req.params.id;
     const { item_id, quantity = 1, options = '[]' } = req.body;
@@ -1232,7 +1259,7 @@ app.post('/api/admin/players/:id/inventory', async (req, res) => {
 });
 
 // DELETE /api/admin/players/:playerId/inventory/:slot — Xóa vật phẩm khỏi hành trang
-app.delete('/api/admin/players/:playerId/inventory/:slot', async (req, res) => {
+app.delete('/api/admin/players/:playerId/inventory/:slot', requireAdmin, async (req, res) => {
   try {
     const { playerId, slot } = req.params;
     const slotIdx = Number(slot);
@@ -1264,7 +1291,7 @@ app.delete('/api/admin/players/:playerId/inventory/:slot', async (req, res) => {
 });
 
 // GET /api/admin/item-templates — Lấy danh sách item từ item_template (cho item picker)
-app.get('/api/admin/item-templates', async (req, res) => {
+app.get('/api/admin/item-templates', requireAdmin, async (req, res) => {
   try {
     const { search, page = 1, limit = 100 } = req.query;
     let sql = 'SELECT id, NAME as name, icon_id, TYPE as type, gender, level, description FROM item_template WHERE 1=1';
@@ -1300,7 +1327,7 @@ app.get('/api/admin/item-templates', async (req, res) => {
 });
 
 // GET /api/admin/item-options — Lấy danh sách item_option_template
-app.get('/api/admin/item-options', async (req, res) => {
+app.get('/api/admin/item-options', requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, NAME as name, color FROM item_option_template ORDER BY id ASC');
     res.json({ data: rows });
@@ -1311,7 +1338,7 @@ app.get('/api/admin/item-options', async (req, res) => {
 });
 
 // GET /api/admin/giftcode-items/:id — Lấy detail giftcode kèm icon_id từ item_template
-app.get('/api/admin/giftcode-items/:id', async (req, res) => {
+app.get('/api/admin/giftcode-items/:id', requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT detail FROM giftcode WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy giftcode' });
@@ -1437,6 +1464,94 @@ app.get('/api/stats', async (req, res) => {
     res.json({ totalPosts, totalUsers, totalGiftcodes });
   } catch (err) {
     console.error('GET /api/stats error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ======================== TOP SERVER ========================
+
+// GET /api/top-server — Lấy bảng xếp hạng top server
+app.get('/api/top-server', async (req, res) => {
+  try {
+    const LIMIT = 50;
+
+    // ---- TOP NHIỆM VỤ ----
+    const [taskRows] = await pool.query('SELECT name, data_task FROM player');
+    const taskList = [];
+    for (const row of taskRows) {
+      try {
+        const parsed = JSON.parse(row.data_task || '[]');
+        const taskCount = Number(parsed[0]) || 0;
+        if (taskCount > 0) {
+          taskList.push({ name: row.name, value: taskCount });
+        }
+      } catch { continue; }
+    }
+    taskList.sort((a, b) => b.value - a.value);
+    const topTask = taskList.slice(0, LIMIT).map((item, i) => ({
+      rank: i + 1,
+      name: item.name,
+      value: item.value,
+    }));
+
+    // ---- TOP ĐẠI GIA (danap = tổng nạp) ----
+    const [depositRows] = await pool.query(
+      `SELECT p.name, a.danap 
+       FROM player p 
+       JOIN account a ON p.account_id = a.id 
+       WHERE a.danap > 0 
+       ORDER BY a.danap DESC 
+       LIMIT ?`, [LIMIT]
+    );
+    const topDeposit = depositRows.map((row, i) => ({
+      rank: i + 1,
+      name: row.name,
+      value: Number(row.danap) || 0,
+    }));
+
+    // ---- TOP SỨC MẠNH ----
+    // data_top[3] = sức mạnh, data_top[4] = timestamp đạt được
+    // pet: phần tử thứ 2 (index 1) trong mảng pet chứa stats, index 1 của stats = pet power
+    const [powerRows] = await pool.query('SELECT name, data_top, pet FROM player');
+    const powerList = [];
+    for (const row of powerRows) {
+      try {
+        const topData = JSON.parse(row.data_top || '[]');
+        const power = Number(topData[3]) || 0;
+        const timestamp = Number(topData[4]) || 0;
+
+        // Parse pet power cho tiebreaker
+        let petPower = 0;
+        try {
+          const petArr = JSON.parse(row.pet || '[]');
+          if (petArr.length >= 2) {
+            const petStatsStr = petArr[1];
+            const petStats = typeof petStatsStr === 'string' ? JSON.parse(petStatsStr) : petStatsStr;
+            petPower = Number(petStats[1]) || 0;
+          }
+        } catch { /* ignore pet parse errors */ }
+
+        if (power > 0) {
+          powerList.push({ name: row.name, value: power, petPower, timestamp });
+        }
+      } catch { continue; }
+    }
+    // Sort: power DESC, petPower DESC, timestamp ASC (ai đạt trước xếp trước)
+    powerList.sort((a, b) => {
+      if (b.value !== a.value) return b.value - a.value;
+      if (b.petPower !== a.petPower) return b.petPower - a.petPower;
+      return a.timestamp - b.timestamp; // timestamp nhỏ hơn = đạt trước
+    });
+    const topPower = powerList.slice(0, LIMIT).map((item, i) => ({
+      rank: i + 1,
+      name: item.name,
+      value: item.value,
+      pet_power: item.petPower,
+    }));
+
+    res.json({ task: topTask, deposit: topDeposit, power: topPower });
+  } catch (err) {
+    console.error('GET /api/top-server error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

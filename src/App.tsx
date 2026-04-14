@@ -18,6 +18,7 @@ import AdminPage from "@/pages/AdminPage";
 import CreatePostPage from "@/pages/CreatePostPage";
 import MyPostsPage from "@/pages/MyPostsPage";
 import DepositPage from "@/pages/DepositPage";
+import TopServerPage from "@/pages/TopServerPage";
 import NotFound from "./pages/NotFound.tsx";
 import ScrollToTop from "./components/ScrollToTop";
 import BackToTop from "./components/shared/BackToTop";
@@ -55,6 +56,7 @@ const App = () => {
             <Route path="/events" element={<Layout isDark={isDark} onToggleTheme={toggle}><EventsPage /></Layout>} />
             <Route path="/giftcode" element={<Layout isDark={isDark} onToggleTheme={toggle}><GiftcodePage /></Layout>} />
             <Route path="/community" element={<Layout isDark={isDark} onToggleTheme={toggle}><CommunityPage /></Layout>} />
+            <Route path="/top-server" element={<Layout isDark={isDark} onToggleTheme={toggle}><TopServerPage /></Layout>} />
             <Route path="*" element={<Layout isDark={isDark} onToggleTheme={toggle}><NotFound /></Layout>} />
           </Routes>
         </BrowserRouter>
