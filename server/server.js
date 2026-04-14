@@ -1494,31 +1494,34 @@ app.get('/api/top-server', async (req, res) => {
       value: item.value,
     }));
 
-    // ---- TOP ĐẠI GIA (danap = tổng nạp) ----
+    // ---- TOP ĐẠI GIA (tổng nạp từ bảng payments) ----
+    // Ưu tiên danap từ account, fallback sang SUM payments nếu danap = 0
     const [depositRows] = await pool.query(
-      `SELECT p.name, a.danap 
+      `SELECT p.name, COALESCE(
+        NULLIF(a.danap, 0),
+        (SELECT COALESCE(SUM(pay.amount), 0) FROM payments pay WHERE pay.name = a.id AND pay.status = 1)
+      ) as total_deposit
        FROM player p 
        JOIN account a ON p.account_id = a.id 
-       WHERE a.danap > 0 
-       ORDER BY a.danap DESC 
+       HAVING total_deposit > 0
+       ORDER BY total_deposit DESC 
        LIMIT ?`, [LIMIT]
     );
     const topDeposit = depositRows.map((row, i) => ({
       rank: i + 1,
       name: row.name,
-      value: Number(row.danap) || 0,
+      value: Number(row.total_deposit) || 0,
     }));
 
     // ---- TOP SỨC MẠNH ----
-    // data_top[3] = sức mạnh, data_top[4] = timestamp đạt được
-    // pet: phần tử thứ 2 (index 1) trong mảng pet chứa stats, index 1 của stats = pet power
-    const [powerRows] = await pool.query('SELECT name, data_top, pet FROM player');
+    // data_point[1] = sức mạnh (HP/power tổng)
+    // pet: phần tử thứ 2 (index 1) trong mảng pet chứa stats, stats[1] = pet power
+    const [powerRows] = await pool.query('SELECT name, data_point, pet FROM player');
     const powerList = [];
     for (const row of powerRows) {
       try {
-        const topData = JSON.parse(row.data_top || '[]');
-        const power = Number(topData[3]) || 0;
-        const timestamp = Number(topData[4]) || 0;
+        const pointData = JSON.parse(row.data_point || '[]');
+        const power = Number(pointData[1]) || 0;
 
         // Parse pet power cho tiebreaker
         let petPower = 0;
@@ -1532,15 +1535,14 @@ app.get('/api/top-server', async (req, res) => {
         } catch { /* ignore pet parse errors */ }
 
         if (power > 0) {
-          powerList.push({ name: row.name, value: power, petPower, timestamp });
+          powerList.push({ name: row.name, value: power, petPower });
         }
       } catch { continue; }
     }
-    // Sort: power DESC, petPower DESC, timestamp ASC (ai đạt trước xếp trước)
+    // Sort: power DESC, petPower DESC (ai có pet mạnh hơn xếp trước khi power bằng nhau)
     powerList.sort((a, b) => {
       if (b.value !== a.value) return b.value - a.value;
-      if (b.petPower !== a.petPower) return b.petPower - a.petPower;
-      return a.timestamp - b.timestamp; // timestamp nhỏ hơn = đạt trước
+      return b.petPower - a.petPower;
     });
     const topPower = powerList.slice(0, LIMIT).map((item, i) => ({
       rank: i + 1,
