@@ -675,13 +675,66 @@ app.delete('/api/giftcodes/:id', async (req, res) => {
 
 // ======================== AUTH ========================
 
+// reCAPTCHA v3 verification helper
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+
+async function verifyRecaptcha(token, expectedAction) {
+  if (!RECAPTCHA_SECRET_KEY || RECAPTCHA_SECRET_KEY === 'YOUR_SECRET_KEY_HERE') {
+    console.warn('⚠️ RECAPTCHA_SECRET_KEY chưa được cấu hình, bỏ qua kiểm tra reCAPTCHA');
+    return { success: true, score: 1.0 }; // Bỏ qua nếu chưa cấu hình
+  }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('secret', RECAPTCHA_SECRET_KEY);
+    params.append('response', token);
+
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    const data = await response.json();
+    console.log(`reCAPTCHA verify [${expectedAction}]:`, { success: data.success, score: data.score, action: data.action });
+
+    if (!data.success) {
+      return { success: false, score: 0, error: 'Xác minh reCAPTCHA thất bại' };
+    }
+
+    // Kiểm tra action khớp
+    if (expectedAction && data.action !== expectedAction) {
+      return { success: false, score: data.score, error: 'Action reCAPTCHA không khớp' };
+    }
+
+    // Score < 0.5 => likely bot
+    if (data.score < 0.5) {
+      return { success: false, score: data.score, error: `Hệ thống phát hiện hành vi bot (score: ${data.score})` };
+    }
+
+    return { success: true, score: data.score };
+  } catch (err) {
+    console.error('reCAPTCHA verify error:', err);
+    return { success: false, score: 0, error: 'Lỗi xác minh reCAPTCHA' };
+  }
+}
+
 // POST /api/auth/register — Đăng ký
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, recaptchaToken } = req.body;
 
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin' });
+    }
+
+    // Xác minh reCAPTCHA v3
+    if (!recaptchaToken) {
+      return res.status(400).json({ error: 'Thiếu mã xác minh reCAPTCHA' });
+    }
+    const captchaResult = await verifyRecaptcha(recaptchaToken, 'register');
+    if (!captchaResult.success) {
+      return res.status(403).json({ error: captchaResult.error || 'Xác minh reCAPTCHA thất bại' });
     }
     // Kiểm tra username đã tồn tại
     const [existUser] = await pool.query('SELECT id FROM account WHERE username = ?', [username]);
@@ -714,11 +767,20 @@ app.post('/api/auth/register', async (req, res) => {
 // POST /api/auth/login — Đăng nhập (hỗ trợ email hoặc username)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { identifier, email, password } = req.body;
+    const { identifier, email, password, recaptchaToken } = req.body;
     const loginId = identifier || email; // hỗ trợ cả 2 field name
 
     if (!loginId || !password) {
       return res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin' });
+    }
+
+    // Xác minh reCAPTCHA v3
+    if (!recaptchaToken) {
+      return res.status(400).json({ error: 'Thiếu mã xác minh reCAPTCHA' });
+    }
+    const captchaResult = await verifyRecaptcha(recaptchaToken, 'login');
+    if (!captchaResult.success) {
+      return res.status(403).json({ error: captchaResult.error || 'Xác minh reCAPTCHA thất bại' });
     }
 
     // Tìm account theo email hoặc username

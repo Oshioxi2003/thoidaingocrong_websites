@@ -6,6 +6,26 @@ import bgAuth from '@/assets/bg-auth.jpg';
 
 type AuthMode = 'login' | 'register' | 'forgot';
 
+// reCAPTCHA v3 site key
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeDdZgsAAAAANxQniBNuuQToBXnnsu-hOhEZx2i';
+
+// Helper: lấy reCAPTCHA v3 token
+function getRecaptchaToken(action: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const grecaptcha = (window as any).grecaptcha;
+    if (!grecaptcha) {
+      reject(new Error('reCAPTCHA chưa được tải'));
+      return;
+    }
+    grecaptcha.ready(() => {
+      grecaptcha
+        .execute(RECAPTCHA_SITE_KEY, { action })
+        .then((token: string) => resolve(token))
+        .catch((err: any) => reject(err));
+    });
+  });
+}
+
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -51,10 +71,20 @@ export default function AuthPage() {
         return;
       }
 
+      // Lấy reCAPTCHA v3 token
+      let recaptchaToken = '';
+      try {
+        recaptchaToken = await getRecaptchaToken(mode === 'login' ? 'login' : 'register');
+      } catch {
+        setErrors({ server: 'Không thể xác minh reCAPTCHA. Vui lòng tải lại trang.' });
+        setLoading(false);
+        return;
+      }
+
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const body = mode === 'register'
-        ? { username: form.name, email: form.email, password: form.password }
-        : { identifier: form.identifier, password: form.password };
+        ? { username: form.name, email: form.email, password: form.password, recaptchaToken }
+        : { identifier: form.identifier, password: form.password, recaptchaToken };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -220,6 +250,19 @@ export default function AuthPage() {
                     </>
                   )}
                 </button>
+
+                {/* reCAPTCHA branding notice */}
+                <p className="text-center text-[10px] leading-tight text-muted-foreground/60">
+                  Trang này được bảo vệ bởi reCAPTCHA và tuân theo{' '}
+                  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
+                    Chính sách bảo mật
+                  </a>{' '}
+                  &{' '}
+                  <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
+                    Điều khoản dịch vụ
+                  </a>{' '}
+                  của Google.
+                </p>
               </form>
 
               {/* Switch mode */}
