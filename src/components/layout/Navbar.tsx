@@ -6,7 +6,7 @@ import logo from '@/assets/logo.png';
 
 const navLinks = [
   { label: 'Trang chủ', to: '/' },
-  { label: 'Giới thiệu', to: '/about' },
+  { label: 'Hướng dẫn', to: '/guides' },
   { label: 'Tải game', to: '/download' },
   { label: 'Tin tức', to: '/news' },
   { label: 'Sự kiện', to: '/events' },

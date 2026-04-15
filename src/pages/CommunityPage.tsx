@@ -13,7 +13,7 @@ import { useSEO, getPostUrl } from '@/lib/seo';
 const communities = [
   { name: 'Facebook Group', desc: 'Tham gia cộng đồng 50.000+ thành viên trên Facebook', url: 'https://www.facebook.com/thoidaingocrong/', icon: Users, members: '50K+' },
   { name: 'Zalo Group', desc: 'Chat trực tiếp, tìm đội, chia sẻ chiến thuật', url: 'https://zalo.me/g/uytblh319', icon: MessageCircle, members: '25K+' },
-  { name: 'YouTube Channel', desc: 'Xem gameplay, hướng dẫn và livestream hàng tuần', url: '#', icon: ExternalLink, members: '100K+' },
+  { name: 'YouTube Channel', desc: 'Xem gameplay, hướng dẫn và livestream hàng tuần', url: 'https://www.youtube.com/@huymetv007', icon: ExternalLink, members: '100K+' },
 ];
 
 interface UserInfo {

@@ -15,7 +15,7 @@ export default function Footer() {
           <div>
             <h4 className="mb-3 font-display text-sm font-semibold text-foreground">Khám phá</h4>
             <div className="flex flex-col gap-2">
-              {[['Trang chủ', '/'], ['Giới thiệu', '/about'], ['Tải game', '/download']].map(([label, to]) => (
+              {[['Trang chủ', '/'], ['Hướng dẫn', '/guides'], ['Tải game', '/download']].map(([label, to]) => (
                 <Link key={to} to={to} className="text-sm text-muted-foreground transition-colors hover:text-primary">{label}</Link>
               ))}
             </div>

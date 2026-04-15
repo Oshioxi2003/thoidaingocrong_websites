@@ -87,14 +87,18 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export async function fetchPosts(params?: {
   search?: string;
   category?: string | number;
+  excludeCategory?: string | number;
   page?: number;
   limit?: number;
+  searchMode?: string;
 }): Promise<PaginatedResponse<Post>> {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.category !== undefined && params.category !== 'all') q.set('category', String(params.category));
+  if (params?.excludeCategory !== undefined) q.set('excludeCategory', String(params.excludeCategory));
   if (params?.page) q.set('page', String(params.page));
   if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.searchMode) q.set('searchMode', params.searchMode);
   return request<PaginatedResponse<Post>>(`/posts?${q.toString()}`);
 }
 
@@ -407,4 +411,10 @@ export async function fetchItemTemplates(params?: {
   if (params?.page) q.set('page', String(params.page));
   if (params?.limit) q.set('limit', String(params.limit));
   return request<PaginatedResponse<ItemTemplate>>(`/admin/item-templates?${q.toString()}`);
+}
+
+// ============ Gallery API ============
+
+export async function fetchGallery(): Promise<{ data: string[] }> {
+  return request<{ data: string[] }>('/gallery');
 }

@@ -30,8 +30,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- reCAPTCHA v3 -->
-    <script src="https://www.google.com/recaptcha/api.js?render=6LeDdZgsAAAAANxQniBNuuQToBXnnsu-hOhEZx2i" async defer></script>
+    <!-- DNS prefetch for API server (production) -->
+    <link rel="dns-prefetch" href="https://thoidaingocrong.com" />
+
+    <!-- reCAPTCHA v3 — lazy loaded, chỉ cần trên auth pages -->
+    <script>
+      // Defer reCAPTCHA loading until user interacts or navigates to auth
+      function loadRecaptcha() {
+        if (document.querySelector('script[src*="recaptcha"]')) return;
+        var s = document.createElement('script');
+        s.src = 'https://www.google.com/recaptcha/api.js?render=6LeDdZgsAAAAANxQniBNuuQToBXnnsu-hOhEZx2i';
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
+      }
+      // Load reCAPTCHA when user is about to interact or after 5s idle
+      setTimeout(loadRecaptcha, 5000);
+    </script>
   </head>
 
   <body>

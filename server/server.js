@@ -1,10 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import pool from './db.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync, mkdirSync, createWriteStream } from 'fs';
+import { existsSync, mkdirSync, createWriteStream, readdirSync } from 'fs';
 import multer from 'multer';
 import https from 'https';
 import http from 'http';
@@ -15,6 +16,10 @@ dotenv.config({ path: join(__dirname, '..', '.env') });
 
 const app = express();
 const PORT = parseInt(process.env.SERVER_PORT || '3001');
+
+// ======================== PERFORMANCE MIDDLEWARE ========================
+// Gzip/Brotli compression — giảm 60-80% kích thước response
+app.use(compression());
 
 app.use(cors());
 app.use(express.json());
@@ -63,13 +68,22 @@ app.use('/download', express.static(downloadDir, {
 // Serve built frontend static files in production
 if (process.env.NODE_ENV === 'production') {
   const distDir = join(__dirname, '..', 'dist');
-  app.use(express.static(distDir));
+  app.use(express.static(distDir, {
+    maxAge: '1y',              // Cache hashed assets for 1 year
+    immutable: true,           // Vite hashes filenames, safe to mark immutable
+    setHeaders: (res, filePath) => {
+      // index.html should never be cached (SPA entry)
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }));
 }
 
 // Serve media files (uploaded images)
 const mediaDir = join(__dirname, '..', 'media');
 if (!existsSync(mediaDir)) mkdirSync(mediaDir, { recursive: true });
-app.use('/media', express.static(mediaDir));
+app.use('/media', express.static(mediaDir, { maxAge: '30d' }));
 
 // ======================== IMAGE UPLOAD ========================
 
@@ -191,9 +205,17 @@ app.post('/api/upload/image-url', async (req, res) => {
 // GET /api/posts — Lấy danh sách bài viết (chỉ hiển thị bài approved cho public)
 app.get('/api/posts', async (req, res) => {
   try {
-    const { search, category, page = 1, limit = 20, status } = req.query;
-    let sql = 'SELECT * FROM posts WHERE 1=1';
+    const { search, category, excludeCategory, page = 1, limit = 20, status, searchMode } = req.query;
+    let selectClause = 'SELECT *';
+    // Khi searchMode=title_first, thêm cột phụ để ưu tiên kết quả khớp tiêu đề
+    if (search && searchMode === 'title_first') {
+      selectClause = 'SELECT *, (title LIKE ?) AS title_match';
+    }
+    let sql = `${selectClause} FROM posts WHERE 1=1`;
     const params = [];
+    if (search && searchMode === 'title_first') {
+      params.push(`%${search}%`);
+    }
 
     // Admin có thể xem tất cả status, public chỉ xem approved
     if (status) {
@@ -211,11 +233,21 @@ app.get('/api/posts', async (req, res) => {
       sql += ' AND category = ?';
       params.push(Number(category));
     }
+    // Loại trừ category (VD: loại trừ Sự kiện khi xem Tất cả)
+    if (excludeCategory !== undefined && excludeCategory !== '') {
+      sql += ' AND category != ?';
+      params.push(Number(excludeCategory));
+    }
 
-    sql += ' ORDER BY created_at DESC';
+    // Sắp xếp: ưu tiên title match trước nếu có search
+    if (search && searchMode === 'title_first') {
+      sql += ' ORDER BY title_match DESC, created_at DESC';
+    } else {
+      sql += ' ORDER BY created_at DESC';
+    }
 
     // Count total
-    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
+    const countSql = sql.replace(/SELECT .+ FROM/, 'SELECT COUNT(*) as total FROM').replace(/ ORDER BY .+$/, '');
     const [countRows] = await pool.query(countSql, params);
     const total = countRows[0].total;
 
@@ -1569,6 +1601,33 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(join(distDir, 'index.html'));
   });
 }
+
+// ======================== GALLERY (public/images) ========================
+
+// GET /api/gallery — Tự động liệt kê tất cả ảnh trong public/images
+const galleryDir = join(__dirname, '..', 'public', 'images');
+app.get('/api/gallery', (_req, res) => {
+  try {
+    if (!existsSync(galleryDir)) {
+      return res.json({ data: [] });
+    }
+    const exts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg'];
+    const files = readdirSync(galleryDir)
+      .filter(f => exts.some(ext => f.toLowerCase().endsWith(ext)))
+      .sort((a, b) => {
+        // Sắp xếp theo số nếu tên file là số, ngược lại theo alphabet
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localeCompare(b);
+      })
+      .map(f => `/images/${f}`);
+    res.json({ data: files });
+  } catch (err) {
+    console.error('GET /api/gallery error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
 
 // ======================== START ========================
 app.listen(PORT, () => {
