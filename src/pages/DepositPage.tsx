@@ -379,9 +379,12 @@ export default function DepositPage() {
                     </div>
 
                     {/* Warning */}
-                    <div className="mb-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4">
+                    <div className="mb-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-1">
                       <p className="text-sm text-yellow-500">
-                        ⚠️ Vui lòng chuyển đúng <strong>số tiền</strong> và <strong>nội dung</strong> để hệ thống tự động xác nhận.
+                        ⚠️ Vui lòng chuyển đúng <strong>số tiền</strong> và <strong>nội dung chuyển khoản</strong> (bao gồm mã số) để hệ thống tự động xác nhận.
+                      </p>
+                      <p className="text-xs text-yellow-500/70">
+                        ⏰ Đơn nạp sẽ tự động hết hạn sau 24 giờ nếu chưa chuyển khoản.
                       </p>
                     </div>
 

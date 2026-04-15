@@ -933,25 +933,38 @@ app.post('/api/deposit/create', async (req, res) => {
       return res.status(400).json({ error: 'Số tiền nạp tối thiểu 10,000 VND' });
     }
 
-    // Tạo nội dung chuyển khoản: username + chuyentien
-    const transfer_code = `${username} chuyentien`;
-
+    // Xóa các đơn pending quá 24 giờ
+    await pool.query("DELETE FROM payments WHERE status = 0 AND transfer_code IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)");
     // Xóa các record cũ bị kẹt (refNo rỗng hoặc format NAP cũ)
     await pool.query("DELETE FROM payments WHERE status = 0 AND (refNo = '' OR transfer_code LIKE 'NAP%')");
 
-    // Check if there's already a pending order for this user with same amount (trong 24 giờ)
-    const [existing] = await pool.query(
-      "SELECT * FROM payments WHERE user_id = ? AND amount = ? AND status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)",
-      [user_id, Number(amount)]
+    // Check nếu user đã có đơn pending (bất kỳ amount nào) trong 24h
+    const [existingAny] = await pool.query(
+      "SELECT * FROM payments WHERE user_id = ? AND status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR) ORDER BY created_at DESC LIMIT 1",
+      [user_id]
     );
-    if (existing.length > 0) {
+    if (existingAny.length > 0) {
       return res.json({
         message: 'Đã có đơn nạp đang chờ',
-        deposit: existing[0],
+        deposit: existingAny[0],
         bank: { bank: BANK_CONFIG.bank, accountName: BANK_CONFIG.accountName, accountNumber: BANK_CONFIG.accountNumber },
       });
     }
 
+    // Tạo 4 số random duy nhất (không trùng với đơn pending nào khác)
+    let randomCode;
+    let attempts = 0;
+    do {
+      randomCode = String(Math.floor(1000 + Math.random() * 9000)); // 1000-9999
+      const [dup] = await pool.query(
+        "SELECT id FROM payments WHERE status = 0 AND transfer_code LIKE ? AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)",
+        [`% ${randomCode}`]
+      );
+      if (dup.length === 0) break;
+      attempts++;
+    } while (attempts < 20);
+
+    const transfer_code = `${username} ${randomCode}`;
     const uniqueRef = `${transfer_code}_${Date.now()}`;
     const [result] = await pool.query(
       "INSERT INTO payments (name, refNo, amount, status, bank, date, transfer_code, user_id, username) VALUES (?, ?, ?, 0, ?, NOW(), ?, ?, ?)",
@@ -1074,7 +1087,15 @@ app.get('/api/deposit/history', async (req, res) => {
 // Tự động kiểm tra tất cả đơn pending mỗi 30 giây — không cần user bấm nút
 async function autoCheckPendingDeposits() {
   try {
-    // Lấy tất cả đơn pending trong 24 giờ qua
+    // Xóa đơn pending quá 24h (giải phóng mã số 4 chữ số)
+    const [expired] = await pool.query(
+      "DELETE FROM payments WHERE status = 0 AND transfer_code IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+    );
+    if (expired.affectedRows > 0) {
+      console.log(`🗑️ [Auto-cleanup] Xóa ${expired.affectedRows} đơn pending quá 24h`);
+    }
+
+    // Lấy tất cả đơn pending còn hiệu lực
     const [pendingDeposits] = await pool.query(
       "SELECT * FROM payments WHERE status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)"
     );
@@ -1109,7 +1130,7 @@ async function autoCheckPendingDeposits() {
         const refNo = matched.transactionNumber || matched.refNo || matched.id || '';
         await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
         await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ?, vnd = vnd + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.amount, deposit.user_id]);
-        console.log(`✅ [Auto-check] Nạp thành công ${deposit.amount.toLocaleString()}đ cho user #${deposit.user_id} (${deposit.username})`);
+        console.log(`✅ [Auto-check] Nạp thành công ${deposit.amount.toLocaleString()}đ cho user #${deposit.user_id} (${deposit.username}) - Mã: ${deposit.transfer_code}`);
       }
     }
   } catch (err) {
