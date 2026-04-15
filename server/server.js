@@ -939,9 +939,9 @@ app.post('/api/deposit/create', async (req, res) => {
     // Xóa các record cũ bị kẹt (refNo rỗng hoặc format NAP cũ)
     await pool.query("DELETE FROM payments WHERE status = 0 AND (refNo = '' OR transfer_code LIKE 'NAP%')");
 
-    // Check if there's already a pending order for this user with same amount
+    // Check if there's already a pending order for this user with same amount (trong 24 giờ)
     const [existing] = await pool.query(
-      "SELECT * FROM payments WHERE user_id = ? AND amount = ? AND status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)",
+      "SELECT * FROM payments WHERE user_id = ? AND amount = ? AND status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)",
       [user_id, Number(amount)]
     );
     if (existing.length > 0) {
@@ -1069,6 +1069,59 @@ app.get('/api/deposit/history', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
+
+// ======================== BACKGROUND AUTO-CHECK PENDING DEPOSITS ========================
+// Tự động kiểm tra tất cả đơn pending mỗi 30 giây — không cần user bấm nút
+async function autoCheckPendingDeposits() {
+  try {
+    // Lấy tất cả đơn pending trong 24 giờ qua
+    const [pendingDeposits] = await pool.query(
+      "SELECT * FROM payments WHERE status = 0 AND transfer_code IS NOT NULL AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+    );
+
+    if (pendingDeposits.length === 0) return;
+
+    // Gọi API bank 1 lần duy nhất cho tất cả đơn
+    const apiUrl = `https://api.sieuthicode.net/historyapi${BANK_CONFIG.bank.toLowerCase()}/${BANK_CONFIG.token}`;
+    let apiData;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const apiRes = await fetch(apiUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      apiData = await apiRes.json();
+    } catch {
+      return; // API lỗi, thử lại lần sau
+    }
+
+    if (!apiData?.data || !Array.isArray(apiData.data)) return;
+
+    // Kiểm tra từng đơn pending
+    for (const deposit of pendingDeposits) {
+      const matched = apiData.data.find(tx => {
+        if (tx.type && tx.type !== 'IN') return false;
+        const content = (tx.description || '').toUpperCase();
+        const txAmount = Number(tx.amount || 0);
+        return content.includes(deposit.transfer_code.toUpperCase()) && txAmount >= deposit.amount;
+      });
+
+      if (matched) {
+        const refNo = matched.transactionNumber || matched.refNo || matched.id || '';
+        await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
+        await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ?, vnd = vnd + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.amount, deposit.user_id]);
+        console.log(`✅ [Auto-check] Nạp thành công ${deposit.amount.toLocaleString()}đ cho user #${deposit.user_id} (${deposit.username})`);
+      }
+    }
+  } catch (err) {
+    console.error('[Auto-check] Error:', err.message);
+  }
+}
+
+// Chạy auto-check mỗi 30 giây
+setInterval(autoCheckPendingDeposits, 30 * 1000);
+// Chạy ngay 1 lần khi server khởi động (sau 5 giây)
+setTimeout(autoCheckPendingDeposits, 5000);
+console.log('🔄 Auto-check pending deposits: Running every 30 seconds');
 
 // ======================== ADMIN — QUẢN LÝ DÒNG TIỀN ========================
 

@@ -69,7 +69,7 @@ export default function DepositPage() {
     if (!historyData || !user || currentDeposit || resumeChecked) return;
     setResumeChecked(true);
     const pendingDeposit = historyData.data.find(
-      (d) => d.status === 0 && new Date(d.created_at).getTime() > Date.now() - 30 * 60 * 1000
+      (d) => d.status === 0 && new Date(d.created_at).getTime() > Date.now() - 24 * 60 * 60 * 1000
     );
     if (pendingDeposit) {
       // Gọi create để lấy đầy đủ bank info (server trả lại đơn pending nếu có)
@@ -118,7 +118,7 @@ export default function DepositPage() {
   });
 
   const [autoCheckCount, setAutoCheckCount] = useState(0);
-  const MAX_AUTO_CHECK = 60; // Tối đa ~5 phút (60 x 5s)
+  const MAX_AUTO_CHECK = 180; // Tối đa ~15 phút (180 x 5s)
 
   // Auto-check every 5 seconds (dừng khi thành công, lỗi, hoặc quá 60 lần)
   useEffect(() => {
@@ -177,7 +177,25 @@ export default function DepositPage() {
     setCurrentDeposit(null);
     setCheckResult(null);
     setAutoChecking(false);
+    setAutoCheckCount(0);
     queryClient.invalidateQueries({ queryKey: ['deposit-history'] });
+  };
+
+  // Kiểm tra lại đơn pending từ lịch sử
+  const handleRecheckFromHistory = (deposit: DepositOrder) => {
+    // Gọi create để lấy bank info (server trả lại đơn pending nếu còn)
+    createDeposit({ user_id: user!.id, username: user!.username, amount: deposit.amount })
+      .then((data) => {
+        setCurrentDeposit(data);
+        setAmount(deposit.amount);
+        setCheckResult(null);
+        setAutoChecking(false);
+        setAutoCheckCount(0);
+        setStep(2);
+      })
+      .catch((err) => {
+        setCheckResult({ status: 'error', message: err.message });
+      });
   };
 
   const formatVND = (n: number) => n.toLocaleString('vi-VN');
@@ -483,15 +501,18 @@ export default function DepositPage() {
                         <span className="font-display text-sm font-semibold text-foreground">
                           {formatVND(d.amount)}đ
                         </span>
-                        <span
-                          className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
-                            d.status === 1
-                              ? 'bg-green-500/10 text-green-500'
-                              : 'bg-yellow-500/10 text-yellow-500'
-                          }`}
-                        >
-                          {d.status === 1 ? 'Thành công' : 'Đang chờ'}
-                        </span>
+                        {d.status === 1 ? (
+                          <span className="rounded-lg px-2.5 py-1 text-xs font-medium bg-green-500/10 text-green-500">
+                            Thành công
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRecheckFromHistory(d)}
+                            className="rounded-lg px-2.5 py-1 text-xs font-medium bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 transition-colors cursor-pointer"
+                          >
+                            Đang chờ • Kiểm tra
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
