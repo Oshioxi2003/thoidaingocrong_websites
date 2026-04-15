@@ -32,6 +32,7 @@ interface UserInfo {
   cash: number;
   vang: number;
   vip: number;
+  vnd: number;
 }
 
 export default function DepositPage() {
@@ -284,9 +285,15 @@ export default function DepositPage() {
                     </div>
 
                     {/* Current balance */}
-                    <div className="mb-6 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
-                      <span className="text-sm text-muted-foreground">Số dư hiện tại</span>
-                      <span className="font-display text-sm font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                    <div className="mb-6 space-y-2">
+                      <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <span className="text-sm text-muted-foreground">Số dư Cash</span>
+                        <span className="font-display text-sm font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                        <span className="text-sm text-muted-foreground">Số dư VND</span>
+                        <span className="font-display text-sm font-semibold text-emerald-500">{formatVND(user.vnd || 0)} VND</span>
+                      </div>
                     </div>
 
                     {checkResult && checkResult.status === 'error' && (
@@ -428,9 +435,15 @@ export default function DepositPage() {
                     </motion.div>
                     <h3 className="mb-2 font-display text-xl font-semibold text-green-500">Nạp thành công!</h3>
                     <p className="mb-4 text-muted-foreground">{checkResult?.message}</p>
-                    <div className="mb-6 rounded-xl border border-border bg-muted/30 px-4 py-3">
-                      <span className="text-sm text-muted-foreground">Số dư mới: </span>
-                      <span className="font-display text-lg font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                    <div className="mb-6 space-y-2">
+                      <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <span className="text-sm text-muted-foreground">Số dư Cash: </span>
+                        <span className="font-display text-lg font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                      </div>
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                        <span className="text-sm text-muted-foreground">Số dư VND: </span>
+                        <span className="font-display text-lg font-semibold text-emerald-500">{formatVND(user.vnd || 0)} VND</span>
+                      </div>
                     </div>
                     <button
                       onClick={handleNewDeposit}

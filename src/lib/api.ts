@@ -25,6 +25,7 @@ export interface User {
   cash: number;
   vang: number;
   vip: number;
+  vnd: number;
   ip_address: string | null;
   active: number;
   last_time_login: string;
@@ -53,7 +54,7 @@ export interface PaginatedResponse<T> {
 const API_BASE = '/api';
 
 // Lấy user hiện tại từ localStorage
-export function getCurrentUser(): { id: number; username: string; email: string; is_admin: number; cash: number; vang: number; vip: number } | null {
+export function getCurrentUser(): { id: number; username: string; email: string; is_admin: number; cash: number; vang: number; vip: number; vnd: number } | null {
   try {
     const stored = localStorage.getItem('user');
     if (stored) return JSON.parse(stored);
@@ -284,7 +285,7 @@ export interface DepositCheckResponse {
   status: 'success' | 'pending';
   message: string;
   cash_added?: number;
-  user?: { id: number; username: string; email: string; is_admin: number; cash: number; vang: number; vip: number };
+  user?: { id: number; username: string; email: string; is_admin: number; cash: number; vang: number; vip: number; vnd: number };
 }
 
 export async function createDeposit(data: { user_id: number; username: string; amount: number }): Promise<DepositCreateResponse> {

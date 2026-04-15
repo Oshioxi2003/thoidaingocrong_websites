@@ -195,6 +195,13 @@ app.post('/api/upload/image-url', async (req, res) => {
         ADD INDEX idx_transfer_code (transfer_code)`);
       console.log('✅ Added transfer_code, user_id, username columns to payments table');
     }
+
+    // Thêm cột vnd vào bảng account (số dư VND)
+    const [vndCols] = await pool.query("SHOW COLUMNS FROM account LIKE 'vnd'");
+    if (vndCols.length === 0) {
+      await pool.query("ALTER TABLE account ADD COLUMN vnd BIGINT DEFAULT 0");
+      console.log('✅ Added vnd column to account table');
+    }
   } catch (err) {
     console.error('Auto-migrate error:', err.message);
   }
@@ -498,7 +505,7 @@ app.delete('/api/comments/:id', async (req, res) => {
 app.get('/api/users', requireAdmin, async (req, res) => {
   try {
     const { search, role, status, page = 1, limit = 20 } = req.query;
-    let sql = 'SELECT id, username, email, create_time, ban, is_admin, cash, vang, vip, ip_address, active, last_time_login, last_time_logout FROM account WHERE 1=1';
+    let sql = 'SELECT id, username, email, create_time, ban, is_admin, cash, vang, vip, vnd, ip_address, active, last_time_login, last_time_logout FROM account WHERE 1=1';
     const params = [];
 
     if (search) {
@@ -815,7 +822,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     res.status(201).json({
       message: 'Đăng ký thành công!',
-      user: { id: result.insertId, username, email, is_admin: 0, cash: 0, vang: 0, vip: 0 },
+      user: { id: result.insertId, username, email, is_admin: 0, cash: 0, vang: 0, vip: 0, vnd: 0 },
     });
   } catch (err) {
     console.error('POST /api/auth/register error:', err);
@@ -876,6 +883,7 @@ app.post('/api/auth/login', async (req, res) => {
         cash: account.cash,
         vang: account.vang,
         vip: account.vip,
+        vnd: account.vnd || 0,
       },
     });
   } catch (err) {
@@ -892,7 +900,7 @@ app.get('/api/auth/me', async (req, res) => {
       return res.status(400).json({ error: 'Thiếu user_id' });
     }
     const [rows] = await pool.query(
-      'SELECT id, username, email, is_admin, cash, vang, vip FROM account WHERE id = ?',
+      'SELECT id, username, email, is_admin, cash, vang, vip, vnd FROM account WHERE id = ?',
       [Number(user_id)]
     );
     if (rows.length === 0) {
@@ -1015,12 +1023,12 @@ app.post('/api/deposit/check', async (req, res) => {
     const refNo = matched.transactionNumber || matched.refNo || matched.id || '';
     await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
 
-    // Cộng cash cho user (1 VND = 1 cash)
+    // Cộng cash + VND cho user (1 VND = 1 cash)
     const cashToAdd = deposit.amount;
-    await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ? WHERE id = ?', [cashToAdd, cashToAdd, deposit.user_id]);
+    await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ?, vnd = vnd + ? WHERE id = ?', [cashToAdd, cashToAdd, cashToAdd, deposit.user_id]);
 
     // Lấy thông tin user mới nhất
-    const [updatedUser] = await pool.query('SELECT id, username, email, is_admin, cash, vang, vip FROM account WHERE id = ?', [deposit.user_id]);
+    const [updatedUser] = await pool.query('SELECT id, username, email, is_admin, cash, vang, vip, vnd FROM account WHERE id = ?', [deposit.user_id]);
 
     res.json({
       status: 'success',
@@ -1127,7 +1135,7 @@ app.put('/api/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
     if (status === 1 && deposit.status !== 1) {
       // Duyệt: cộng cash
       await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [`ADMIN_APPROVE_${Date.now()}`, deposit.id]);
-      await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.user_id]);
+      await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ?, vnd = vnd + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.amount, deposit.user_id]);
       res.json({ message: `Đã duyệt và cộng ${deposit.amount.toLocaleString()} cash cho user #${deposit.user_id}` });
     } else if (status === -1) {
       // Từ chối: xóa đơn

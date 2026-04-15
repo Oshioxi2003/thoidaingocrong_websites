@@ -28,6 +28,7 @@ interface UserInfo {
   cash: number;
   vang: number;
   vip: number;
+  vnd: number;
 }
 
 export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
@@ -143,16 +144,20 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                       </div>
 
                       {/* Stats */}
-                      <div className="grid grid-cols-3 gap-px border-b border-border bg-border">
-                        <div className="bg-card px-3 py-2.5 text-center">
+                      <div className="grid grid-cols-4 gap-px border-b border-border bg-border">
+                        <div className="bg-card px-2 py-2.5 text-center">
                           <p className="text-xs text-muted-foreground">Cash</p>
                           <p className="font-display text-sm font-semibold text-primary">{user.cash.toLocaleString()}</p>
                         </div>
-                        <div className="bg-card px-3 py-2.5 text-center">
+                        <div className="bg-card px-2 py-2.5 text-center">
+                          <p className="text-xs text-muted-foreground">VND</p>
+                          <p className="font-display text-sm font-semibold text-emerald-500">{(user.vnd || 0).toLocaleString()}</p>
+                        </div>
+                        <div className="bg-card px-2 py-2.5 text-center">
                           <p className="text-xs text-muted-foreground">Vàng</p>
                           <p className="font-display text-sm font-semibold text-yellow-500">{user.vang.toLocaleString()}</p>
                         </div>
-                        <div className="bg-card px-3 py-2.5 text-center">
+                        <div className="bg-card px-2 py-2.5 text-center">
                           <p className="text-xs text-muted-foreground">VIP</p>
                           <p className="font-display text-sm font-semibold text-purple-400">{user.vip}</p>
                         </div>
