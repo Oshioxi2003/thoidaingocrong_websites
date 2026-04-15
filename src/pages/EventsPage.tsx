@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
 import { Clock, Flame, CalendarX } from 'lucide-react';
 import { fetchPosts, type Post } from '@/lib/api';
 import bgEvents from '@/assets/bg-events.jpg';
-import { useSEO } from '@/lib/seo';
+import { useSEO, getPostUrl } from '@/lib/seo';
 
 function useCountdown(endDate: string | null) {
   const [remaining, setRemaining] = useState(() => {
@@ -54,20 +55,20 @@ function EventCard({ event, index }: { event: Post; index: number }) {
 
   return (
     <AnimatedSection delay={index * 0.1}>
-      <div className="group rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
+      <Link to={getPostUrl(event.id, event.title)} className="group block rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-glow">
         <div className="flex items-center justify-between">
           <Flame size={24} className="text-accent" />
           <span className={`rounded-full px-3 py-0.5 text-xs font-bold ${
             badge === 'HOT' ? 'bg-accent/15 text-accent' : badge === 'NEW' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
           }`}>{badge}</span>
         </div>
-        <h3 className="mt-4 font-display text-xl font-semibold text-foreground">{event.title}</h3>
+        <h3 className="mt-4 font-display text-xl font-semibold text-foreground transition-colors group-hover:text-primary">{event.title}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
         <div className="mt-4 flex items-center gap-2 text-sm text-primary">
           <Clock size={14} />
           <span className="font-mono font-medium">{countdown}</span>
         </div>
-      </div>
+      </Link>
     </AnimatedSection>
   );
 }
