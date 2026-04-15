@@ -106,98 +106,115 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
 
         <div className="flex items-center gap-2">
           {user ? (
-            /* === User Profile Dropdown === */
-            <div className="relative hidden md:block" ref={dropdownRef}>
+            <>
+              {/* === Mobile: Avatar circle that toggles mobile menu === */}
               <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 rounded-xl border border-border bg-card/80 px-3 py-2 text-sm font-medium text-foreground transition-all hover:border-primary/30 hover:shadow-glow"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="flex h-8 w-8 items-center justify-center rounded-full gradient-fire text-xs font-bold text-primary-foreground shadow-glow md:hidden"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full gradient-fire text-xs font-bold text-primary-foreground">
-                  {user.username.charAt(0).toUpperCase()}
-                </div>
-                <span className="max-w-[100px] truncate">{user.username}</span>
-                <ChevronDown size={14} className={`text-muted-foreground transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                {user.username.charAt(0).toUpperCase()}
               </button>
+              {/* === Desktop: User Profile Dropdown === */}
+              <div className="relative hidden md:block" ref={dropdownRef}>
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2 rounded-xl border border-border bg-card/80 px-3 py-2 text-sm font-medium text-foreground transition-all hover:border-primary/30 hover:shadow-glow"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full gradient-fire text-xs font-bold text-primary-foreground">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="max-w-[100px] truncate">{user.username}</span>
+                  <ChevronDown size={14} className={`text-muted-foreground transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
 
-              <AnimatePresence>
-                {dropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
-                  >
-                    {/* User info header */}
-                    <div className="border-b border-border bg-muted/30 px-4 py-3">
-                      <p className="font-display text-sm font-semibold text-foreground">{user.username}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p>
-                    </div>
+                <AnimatePresence>
+                  {dropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
+                    >
+                      {/* User info header */}
+                      <div className="border-b border-border bg-muted/30 px-4 py-3">
+                        <p className="font-display text-sm font-semibold text-foreground">{user.username}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p>
+                      </div>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-px border-b border-border bg-border">
-                      <div className="bg-card px-3 py-2.5 text-center">
-                        <p className="text-xs text-muted-foreground">Cash</p>
-                        <p className="font-display text-sm font-semibold text-primary">{user.cash.toLocaleString()}</p>
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-px border-b border-border bg-border">
+                        <div className="bg-card px-3 py-2.5 text-center">
+                          <p className="text-xs text-muted-foreground">Cash</p>
+                          <p className="font-display text-sm font-semibold text-primary">{user.cash.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-card px-3 py-2.5 text-center">
+                          <p className="text-xs text-muted-foreground">Vàng</p>
+                          <p className="font-display text-sm font-semibold text-yellow-500">{user.vang.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-card px-3 py-2.5 text-center">
+                          <p className="text-xs text-muted-foreground">VIP</p>
+                          <p className="font-display text-sm font-semibold text-purple-400">{user.vip}</p>
+                        </div>
                       </div>
-                      <div className="bg-card px-3 py-2.5 text-center">
-                        <p className="text-xs text-muted-foreground">Vàng</p>
-                        <p className="font-display text-sm font-semibold text-yellow-500">{user.vang.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-card px-3 py-2.5 text-center">
-                        <p className="text-xs text-muted-foreground">VIP</p>
-                        <p className="font-display text-sm font-semibold text-purple-400">{user.vip}</p>
-                      </div>
-                    </div>
 
-                    {/* Actions */}
-                    <div className="p-1.5">
-                      <Link
-                        to="/my-posts"
-                        onClick={() => setDropdownOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
-                      >
-                        <FileText size={16} className="text-muted-foreground" />
-                        Bài viết của tôi
-                      </Link>
-                      <Link
-                        to="/deposit"
-                        onClick={() => setDropdownOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
-                      >
-                        <Wallet size={16} className="text-muted-foreground" />
-                        Nạp tiền
-                      </Link>
-                      {user.is_admin === 1 && (
+                      {/* Actions */}
+                      <div className="p-1.5">
                         <Link
-                          to="/admin"
+                          to="/my-posts"
                           onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
                         >
-                          <User size={16} className="text-muted-foreground" />
-                          Quản trị
+                          <FileText size={16} className="text-muted-foreground" />
+                          Bài viết của tôi
                         </Link>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
-                      >
-                        <LogOut size={16} />
-                        Đăng xuất
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                        <Link
+                          to="/deposit"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
+                        >
+                          <Wallet size={16} className="text-muted-foreground" />
+                          Nạp tiền
+                        </Link>
+                        {user.is_admin === 1 && (
+                          <Link
+                            to="/admin"
+                            onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
+                          >
+                            <User size={16} className="text-muted-foreground" />
+                            Quản trị
+                          </Link>
+                        )}
+                        <button
+                          onClick={handleLogout}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                        >
+                          <LogOut size={16} />
+                          Đăng xuất
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </>
           ) : (
-            /* === Login Button === */
-            <Link
-              to="/auth"
-              className="gradient-fire hidden items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-105 md:inline-flex"
-            >
-              Đăng nhập
-            </Link>
+            /* === Auth Buttons — visible on all screen sizes === */
+            <div className="flex items-center gap-2">
+              <Link
+                to="/auth"
+                className="gradient-fire inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-105"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                to="/auth?tab=register"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary transition-all hover:bg-primary/20 hover:scale-105"
+              >
+                Đăng ký
+              </Link>
+            </div>
           )}
           <button
             onClick={onToggleTheme}
@@ -270,13 +287,22 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                   </button>
                 </>
               ) : (
-                <Link
-                  to="/auth"
-                  onClick={() => setMobileOpen(false)}
-                  className="mt-2 gradient-fire rounded-xl px-4 py-3 text-center text-sm font-semibold text-primary-foreground"
-                >
-                  Đăng nhập
-                </Link>
+                <div className="mt-2 flex gap-2">
+                  <Link
+                    to="/auth"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 gradient-fire rounded-xl px-4 py-3 text-center text-sm font-semibold text-primary-foreground"
+                  >
+                    Đăng nhập
+                  </Link>
+                  <Link
+                    to="/auth?tab=register"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 rounded-xl border border-primary/50 bg-primary/10 px-4 py-3 text-center text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
+                  >
+                    Đăng ký
+                  </Link>
+                </div>
               )}
             </div>
           </motion.div>

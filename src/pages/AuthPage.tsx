@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import bgAuth from '@/assets/bg-auth.jpg';
 
@@ -27,7 +27,17 @@ function getRecaptchaToken(action: string): Promise<string> {
 }
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<AuthMode>(() => {
+    const tab = searchParams.get('tab');
+    return tab === 'register' ? 'register' : 'login';
+  });
+
+  // Sync mode when URL query changes (e.g. user clicks navbar register button while on auth page)
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'register') setMode('register');
+  }, [searchParams]);
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', identifier: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
