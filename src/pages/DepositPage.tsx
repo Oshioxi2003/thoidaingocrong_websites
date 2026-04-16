@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/shared/AnimatedSection';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageBackground from '@/components/shared/PageBackground';
-import { Wallet, Copy, Check, X, Clock, CheckCircle2, Loader2, History, CreditCard, ArrowRight, Sparkles } from 'lucide-react';
+import { Wallet, Copy, Check, X, Clock, CheckCircle2, Loader2, History, CreditCard, ArrowRight, Sparkles, Gift, Shield, Swords, Crown, Gem, Star, Zap } from 'lucide-react';
 import bgEvents from '@/assets/bg-events.jpg';
 import {
   createDeposit,
@@ -120,21 +120,23 @@ export default function DepositPage() {
   const [autoCheckCount, setAutoCheckCount] = useState(0);
   const MAX_AUTO_CHECK = 180; // Tối đa ~15 phút (180 x 5s)
 
-  // Auto-check every 5 seconds (dừng khi thành công, lỗi, hoặc quá 60 lần)
+  // Auto-check every 5 seconds (dừng khi thành công, lỗi, hoặc quá 180 lần)
   useEffect(() => {
     if (!autoChecking || !currentDeposit) return;
-    if (autoCheckCount >= MAX_AUTO_CHECK) {
-      setAutoChecking(false);
-      setCheckResult({ status: 'error', message: 'Đã hết thời gian kiểm tra tự động. Vui lòng bấm kiểm tra lại.' });
-      return;
-    }
     const interval = setInterval(() => {
-      setAutoCheckCount(prev => prev + 1);
-      checkMutation.mutate(currentDeposit.deposit.id);
+      setAutoCheckCount(prev => {
+        if (prev >= MAX_AUTO_CHECK) {
+          setAutoChecking(false);
+          setCheckResult({ status: 'error', message: 'Đã hết thời gian kiểm tra tự động. Vui lòng bấm kiểm tra lại.' });
+          return prev;
+        }
+        checkMutation.mutate(currentDeposit.deposit.id);
+        return prev + 1;
+      });
     }, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoChecking, currentDeposit, autoCheckCount]);
+  }, [autoChecking, currentDeposit]);
 
   const handleSelectAmount = (val: number) => {
     setAmount(val);
@@ -183,15 +185,18 @@ export default function DepositPage() {
 
   // Kiểm tra lại đơn pending từ lịch sử
   const handleRecheckFromHistory = (deposit: DepositOrder) => {
+    if (deposit.status === 1) return; // Đã thành công, không cần check
     // Gọi create để lấy bank info (server trả lại đơn pending nếu còn)
     createDeposit({ user_id: user!.id, username: user!.username, amount: deposit.amount })
       .then((data) => {
         setCurrentDeposit(data);
         setAmount(deposit.amount);
         setCheckResult(null);
-        setAutoChecking(false);
+        setAutoChecking(true);
         setAutoCheckCount(0);
         setStep(2);
+        // Ngay lập tức kiểm tra 1 lần
+        checkMutation.mutate(data.deposit.id);
       })
       .catch((err) => {
         setCheckResult({ status: 'error', message: err.message });
@@ -237,6 +242,65 @@ export default function DepositPage() {
             ))}
           </div>
 
+          {/* 3-column layout: Left rewards | Steps | Right rewards */}
+          <div className="flex justify-center gap-6 items-start">
+            {/* Left Panel - Mốc nạp nhỏ */}
+            <div className="hidden xl:block w-[300px] flex-shrink-0 sticky top-24">
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="rounded-2xl border border-primary/20 bg-card/90 backdrop-blur-sm overflow-hidden">
+                  <div className="gradient-fire px-5 py-3 flex items-center gap-2">
+                    <Gift size={18} className="text-primary-foreground" />
+                    <h3 className="font-display text-sm font-bold text-primary-foreground tracking-wide">🎁 MỐC NẠP THƯỞNG</h3>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* 50k */}
+                    <MilestoneCard
+                      amount="50K"
+                      color="from-slate-500 to-slate-600"
+                      icon={<Star size={16} />}
+                      rewards={['Nhận đệ tự thường']}
+                    />
+                    {/* 100k */}
+                    <MilestoneCard
+                      amount="100K"
+                      color="from-green-500 to-emerald-600"
+                      icon={<Shield size={16} />}
+                      rewards={[
+                        '10 Đá bảo vệ (1143)',
+                        '100 Đá thạch anh tím (224)',
+                      ]}
+                    />
+                    {/* 200k */}
+                    <MilestoneCard
+                      amount="200K"
+                      color="from-blue-500 to-indigo-600"
+                      icon={<Zap size={16} />}
+                      rewards={[
+                        'Cải trang: 20% HP KI SD',
+                        '5% Húp máu',
+                      ]}
+                    />
+                    {/* 500k */}
+                    <MilestoneCard
+                      amount="500K"
+                      color="from-purple-500 to-violet-600"
+                      icon={<Crown size={16} />}
+                      rewards={[
+                        '1 Set Thần Linh',
+                        '30 Đá bảo vệ',
+                      ]}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Center - Main Steps */}
+            <div className="w-full max-w-lg flex-shrink-0">
           {/* Step 1: Chọn mệnh giá */}
           <AnimatePresence mode="wait">
             {step === 1 && (
@@ -361,7 +425,7 @@ export default function DepositPage() {
                     <div className="mb-6 flex flex-col items-center">
                       <div className="rounded-2xl border border-border bg-white p-3">
                         <img
-                          src={`https://img.vietqr.io/image/ACB-${currentDeposit.bank.accountNumber}-compact.png?amount=${currentDeposit.deposit.amount}&addInfo=${currentDeposit.deposit.transfer_code}&accountName=${encodeURIComponent(currentDeposit.bank.accountName)}`}
+                          src={`https://img.vietqr.io/image/${currentDeposit.bank.bank}-${currentDeposit.bank.accountNumber}-compact.png?amount=${currentDeposit.deposit.amount}&addInfo=${currentDeposit.deposit.transfer_code}&accountName=${encodeURIComponent(currentDeposit.bank.accountName)}`}
                           alt="QR Code chuyển khoản"
                           className="h-52 w-52 object-contain"
                         />
@@ -477,6 +541,89 @@ export default function DepositPage() {
               </motion.div>
             )}
           </AnimatePresence>
+            </div>
+
+            {/* Right Panel - Mốc nạp lớn */}
+            <div className="hidden xl:block w-[300px] flex-shrink-0 sticky top-24">
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="rounded-2xl border border-amber-500/20 bg-card/90 backdrop-blur-sm overflow-hidden">
+                  <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-3 flex items-center gap-2">
+                    <Crown size={18} className="text-white" />
+                    <h3 className="font-display text-sm font-bold text-white tracking-wide">👑 MỐC NẠP CAO CẤP</h3>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* 1000k */}
+                    <MilestoneCard
+                      amount="1.000K"
+                      color="from-amber-500 to-orange-600"
+                      icon={<Swords size={16} />}
+                      rewards={[
+                        'Cải trang: 25% HP KI SD',
+                        '10% Húp máu',
+                        '10% Sức đánh chí mạng',
+                        '+ Set Thần Linh',
+                        '+ 50 Đá bảo vệ',
+                      ]}
+                    />
+                    {/* 2000k */}
+                    <MilestoneCard
+                      amount="2.000K"
+                      color="from-rose-500 to-pink-600"
+                      icon={<Gem size={16} />}
+                      rewards={[
+                        'Cải trang: 30% HP KI SD',
+                        '10% Húp máu',
+                        '15% Sức đánh chí mạng',
+                        '+ Set Thần Linh',
+                        '+ 100 Đá bảo vệ',
+                      ]}
+                    />
+                    {/* 5000k */}
+                    <MilestoneCard
+                      amount="5.000K"
+                      color="from-yellow-400 to-amber-500"
+                      icon={<Crown size={16} />}
+                      rewards={[
+                        'Cải trang: 35% HP KI SD',
+                        '15% Húp máu',
+                        '15% Sức đánh chí mạng',
+                        'Kháng lạnh',
+                        '+ Set Thần Linh',
+                        '+ 999 Mảnh găng Thiên Sứ',
+                        '+ 500 Đá bảo vệ',
+                      ]}
+                      legendary
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Mobile: Mốc nạp (hiển thị bên dưới trên mobile) */}
+          <div className="xl:hidden mt-10">
+            <AnimatedSection>
+              <div className="mx-auto max-w-lg rounded-2xl border border-primary/20 bg-card/90 backdrop-blur-sm overflow-hidden">
+                <div className="gradient-fire px-5 py-3 flex items-center gap-2">
+                  <Gift size={18} className="text-primary-foreground" />
+                  <h3 className="font-display text-sm font-bold text-primary-foreground tracking-wide">🎁 MỐC NẠP THƯỞNG</h3>
+                </div>
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <MilestoneCard amount="50K" color="from-slate-500 to-slate-600" icon={<Star size={16} />} rewards={['Nhận đệ tự thường']} />
+                  <MilestoneCard amount="100K" color="from-green-500 to-emerald-600" icon={<Shield size={16} />} rewards={['10 Đá bảo vệ (1143)', '100 Đá thạch anh tím (224)']} />
+                  <MilestoneCard amount="200K" color="from-blue-500 to-indigo-600" icon={<Zap size={16} />} rewards={['Cải trang: 20% HP KI SD', '5% Húp máu']} />
+                  <MilestoneCard amount="500K" color="from-purple-500 to-violet-600" icon={<Crown size={16} />} rewards={['1 Set Thần Linh', '30 Đá bảo vệ']} />
+                  <MilestoneCard amount="1.000K" color="from-amber-500 to-orange-600" icon={<Swords size={16} />} rewards={['Cải trang: 25% HP KI SD', '10% Húp máu', '10% Sức đánh chí mạng', '+ Set TL + 50 Đá bảo vệ']} />
+                  <MilestoneCard amount="2.000K" color="from-rose-500 to-pink-600" icon={<Gem size={16} />} rewards={['Cải trang: 30% HP KI SD', '10% Húp máu', '15% Sức đánh chí mạng', '+ Set TL + 100 Đá bảo vệ']} />
+                  <MilestoneCard amount="5.000K" color="from-yellow-400 to-amber-500" icon={<Crown size={16} />} rewards={['Cải trang: 35% HP KI SD', '15% Húp máu', '15% Sức đánh chí mạng', 'Kháng lạnh', '+ Set TL + 999 Mảnh Thiên Sứ', '+ 500 Đá bảo vệ']} legendary />
+                </div>
+              </div>
+            </AnimatedSection>
+          </div>
 
           {/* Deposit History */}
           <AnimatedSection className="mt-16">
@@ -526,6 +673,43 @@ export default function DepositPage() {
         </div>
       </div>
     </PageBackground>
+  );
+}
+
+// Sub-component: Milestone reward card
+function MilestoneCard({ amount, color, icon, rewards, legendary }: {
+  amount: string;
+  color: string;
+  icon: React.ReactNode;
+  rewards: string[];
+  legendary?: boolean;
+}) {
+  return (
+    <div className={`relative rounded-xl border overflow-hidden transition-all duration-300 hover:scale-[1.02] ${
+      legendary
+        ? 'border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
+        : 'border-border/50'
+    }`}>
+      {legendary && (
+        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-amber-500/5 pointer-events-none" />
+      )}
+      <div className={`bg-gradient-to-r ${color} px-3 py-2 flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <span className="text-white/90">{icon}</span>
+          <span className="font-display text-sm font-bold text-white">{amount}</span>
+        </div>
+        {legendary && <span className="text-xs">✨</span>}
+      </div>
+      <div className="px-3 py-2.5 space-y-1 bg-background/50">
+        {rewards.map((r, i) => (
+          <p key={i} className={`text-xs leading-relaxed ${
+            r.startsWith('+') ? 'text-muted-foreground' : 'text-foreground/90'
+          }`}>
+            <span className="text-primary/70 mr-1">•</span>{r}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 

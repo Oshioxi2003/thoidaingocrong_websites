@@ -16,7 +16,7 @@ const DownloadPage = lazy(() => import("@/pages/DownloadPage"));
 const NewsPage = lazy(() => import("@/pages/NewsPage"));
 const PostDetailPage = lazy(() => import("@/pages/PostDetailPage"));
 const EventsPage = lazy(() => import("@/pages/EventsPage"));
-const GiftcodePage = lazy(() => import("@/pages/GiftcodePage"));
+
 const CommunityPage = lazy(() => import("@/pages/CommunityPage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
@@ -77,7 +77,7 @@ const App = () => {
             <Route path="/news/:id/:slug" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><PostDetailPage /></Suspense></Layout>} />
             <Route path="/news/:id" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><PostDetailPage /></Suspense></Layout>} />
             <Route path="/events" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><EventsPage /></Suspense></Layout>} />
-            <Route path="/giftcode" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><GiftcodePage /></Suspense></Layout>} />
+
             <Route path="/community" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><CommunityPage /></Suspense></Layout>} />
             <Route path="/top-server" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><TopServerPage /></Suspense></Layout>} />
             <Route path="*" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><NotFound /></Suspense></Layout>} />

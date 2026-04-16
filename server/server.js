@@ -202,6 +202,13 @@ app.post('/api/upload/image-url', async (req, res) => {
       await pool.query("ALTER TABLE account ADD COLUMN vnd BIGINT DEFAULT 0");
       console.log('✅ Added vnd column to account table');
     }
+
+    // Thêm cột danap vào bảng account (tổng số tiền đã nạp)
+    const [danapCols] = await pool.query("SHOW COLUMNS FROM account LIKE 'danap'");
+    if (danapCols.length === 0) {
+      await pool.query("ALTER TABLE account ADD COLUMN danap BIGINT DEFAULT 0");
+      console.log('✅ Added danap column to account table');
+    }
   } catch (err) {
     console.error('Auto-migrate error:', err.message);
   }
@@ -929,14 +936,13 @@ app.post('/api/deposit/create', async (req, res) => {
     if (!user_id || !username || !amount) {
       return res.status(400).json({ error: 'Thiếu thông tin' });
     }
-    if (Number(amount) < 10000) {
+    const parsedAmount = Number(amount);
+    if (isNaN(parsedAmount) || parsedAmount < 10000) {
       return res.status(400).json({ error: 'Số tiền nạp tối thiểu 10,000 VND' });
     }
 
     // Xóa các đơn pending quá 24 giờ
     await pool.query("DELETE FROM payments WHERE status = 0 AND transfer_code IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)");
-    // Xóa các record cũ bị kẹt (refNo rỗng hoặc format NAP cũ)
-    await pool.query("DELETE FROM payments WHERE status = 0 AND (refNo = '' OR transfer_code LIKE 'NAP%')");
 
     // Check nếu user đã có đơn pending (bất kỳ amount nào) trong 24h
     const [existingAny] = await pool.query(
@@ -968,7 +974,7 @@ app.post('/api/deposit/create', async (req, res) => {
     const uniqueRef = `${transfer_code}_${Date.now()}`;
     const [result] = await pool.query(
       "INSERT INTO payments (name, refNo, amount, status, bank, date, transfer_code, user_id, username) VALUES (?, ?, ?, 0, ?, NOW(), ?, ?, ?)",
-      [user_id, uniqueRef, Number(amount), BANK_CONFIG.bank, transfer_code, user_id, username]
+      [user_id, uniqueRef, parsedAmount, BANK_CONFIG.bank, transfer_code, user_id, username]
     );
 
     const [newDeposit] = await pool.query('SELECT * FROM payments WHERE id = ?', [result.insertId]);
@@ -998,7 +1004,9 @@ app.post('/api/deposit/check', async (req, res) => {
     }
     const deposit = deposits[0];
     if (deposit.status === 1) {
-      return res.json({ status: 'success', message: 'Đơn nạp đã được xử lý trước đó' });
+      // Đơn đã xử lý — trả user mới nhất để client cập nhật số dư
+      const [updatedUser] = await pool.query('SELECT id, username, email, is_admin, cash, vang, vip, vnd FROM account WHERE id = ?', [deposit.user_id]);
+      return res.json({ status: 'success', message: 'Đơn nạp đã được xử lý thành công!', user: updatedUser[0] || null });
     }
 
     // Gọi API sieuthicode.net (historyapi)
@@ -1032,9 +1040,15 @@ app.post('/api/deposit/check', async (req, res) => {
       return res.json({ status: 'pending', message: 'Chưa tìm thấy giao dịch, vui lòng thử lại sau' });
     }
 
-    // Cập nhật đơn nạp thành công
+    // FIX Bug #1: Atomic UPDATE — chỉ cập nhật nếu status vẫn = 0 (tránh cộng tiền 2 lần)
     const refNo = matched.transactionNumber || matched.refNo || matched.id || '';
-    await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
+    const [updateResult] = await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ? AND status = 0', [String(refNo), deposit.id]);
+
+    if (updateResult.affectedRows === 0) {
+      // Đơn đã được xử lý bởi background auto-check (race condition avoided)
+      const [updatedUser] = await pool.query('SELECT id, username, email, is_admin, cash, vang, vip, vnd FROM account WHERE id = ?', [deposit.user_id]);
+      return res.json({ status: 'success', message: 'Đơn nạp đã được xử lý thành công!', user: updatedUser[0] || null });
+    }
 
     // Cộng cash + VND cho user (1 VND = 1 cash)
     const cashToAdd = deposit.amount;
@@ -1042,6 +1056,8 @@ app.post('/api/deposit/check', async (req, res) => {
 
     // Lấy thông tin user mới nhất
     const [updatedUser] = await pool.query('SELECT id, username, email, is_admin, cash, vang, vip, vnd FROM account WHERE id = ?', [deposit.user_id]);
+
+    console.log(`✅ [User-check] Nạp thành công ${cashToAdd.toLocaleString()}đ cho user #${deposit.user_id} (${deposit.username}) - Mã: ${deposit.transfer_code}`);
 
     res.json({
       status: 'success',
@@ -1085,7 +1101,11 @@ app.get('/api/deposit/history', async (req, res) => {
 
 // ======================== BACKGROUND AUTO-CHECK PENDING DEPOSITS ========================
 // Tự động kiểm tra tất cả đơn pending mỗi 30 giây — không cần user bấm nút
+let autoCheckRunning = false; // Prevent overlapping runs
+
 async function autoCheckPendingDeposits() {
+  if (autoCheckRunning) return; // Tránh chạy chồng nếu lần trước chưa xong
+  autoCheckRunning = true;
   try {
     // Xóa đơn pending quá 24h (giải phóng mã số 4 chữ số)
     const [expired] = await pool.query(
@@ -1127,14 +1147,21 @@ async function autoCheckPendingDeposits() {
       });
 
       if (matched) {
+        // FIX Bug #1: Atomic UPDATE — chỉ cập nhật nếu status vẫn = 0 (tránh cộng tiền 2 lần)
         const refNo = matched.transactionNumber || matched.refNo || matched.id || '';
-        await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ?', [String(refNo), deposit.id]);
-        await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ?, vnd = vnd + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.amount, deposit.user_id]);
-        console.log(`✅ [Auto-check] Nạp thành công ${deposit.amount.toLocaleString()}đ cho user #${deposit.user_id} (${deposit.username}) - Mã: ${deposit.transfer_code}`);
+        const [updateResult] = await pool.query('UPDATE payments SET status = 1, refNo = ? WHERE id = ? AND status = 0', [String(refNo), deposit.id]);
+
+        // Chỉ cộng tiền nếu UPDATE thực sự thay đổi (affectedRows > 0)
+        if (updateResult.affectedRows > 0) {
+          await pool.query('UPDATE account SET cash = cash + ?, danap = danap + ?, vnd = vnd + ? WHERE id = ?', [deposit.amount, deposit.amount, deposit.amount, deposit.user_id]);
+          console.log(`✅ [Auto-check] Nạp thành công ${deposit.amount.toLocaleString()}đ cho user #${deposit.user_id} (${deposit.username}) - Mã: ${deposit.transfer_code}`);
+        }
       }
     }
   } catch (err) {
     console.error('[Auto-check] Error:', err.message);
+  } finally {
+    autoCheckRunning = false;
   }
 }
 

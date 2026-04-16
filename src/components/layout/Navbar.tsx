@@ -10,7 +10,7 @@ const navLinks = [
   { label: 'Tải game', to: '/download' },
   { label: 'Tin tức', to: '/news' },
   { label: 'Sự kiện', to: '/events' },
-  { label: 'Giftcode', to: '/giftcode' },
+
   { label: 'Cộng đồng', to: '/community' },
   { label: 'Top Server', to: '/top-server' },
 ];
