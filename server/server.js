@@ -1099,6 +1099,32 @@ app.get('/api/deposit/history', async (req, res) => {
   }
 });
 
+// POST /api/deposit/cancel — Hủy đơn nạp pending (để tạo đơn mới với mệnh giá khác)
+app.post('/api/deposit/cancel', async (req, res) => {
+  try {
+    const { deposit_id, user_id } = req.body;
+    if (!deposit_id || !user_id) {
+      return res.status(400).json({ error: 'Thiếu thông tin' });
+    }
+
+    // Chỉ hủy đơn pending (status=0) và thuộc về user đó
+    const [result] = await pool.query(
+      'DELETE FROM payments WHERE id = ? AND user_id = ? AND status = 0',
+      [deposit_id, user_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy đơn nạp hoặc đơn đã được xử lý' });
+    }
+
+    console.log(`🗑️ [Cancel] User #${user_id} hủy đơn nạp #${deposit_id}`);
+    res.json({ message: 'Đã hủy đơn nạp' });
+  } catch (err) {
+    console.error('POST /api/deposit/cancel error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ======================== BACKGROUND AUTO-CHECK PENDING DEPOSITS ========================
 // Tự động kiểm tra tất cả đơn pending mỗi 30 giây — không cần user bấm nút
 let autoCheckRunning = false; // Prevent overlapping runs

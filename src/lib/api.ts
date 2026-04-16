@@ -306,6 +306,13 @@ export async function fetchDepositHistory(userId: number, page = 1): Promise<Pag
   return request<PaginatedResponse<DepositOrder>>(`/deposit/history?user_id=${userId}&page=${page}`);
 }
 
+export async function cancelDeposit(deposit_id: number, user_id: number): Promise<{ message: string }> {
+  return request<{ message: string }>('/deposit/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ deposit_id, user_id }),
+  });
+}
+
 // Admin deposit management
 export interface DepositStats {
   totalDeposits: number;

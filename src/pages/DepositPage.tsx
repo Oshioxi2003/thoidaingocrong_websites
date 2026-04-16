@@ -10,6 +10,7 @@ import bgEvents from '@/assets/bg-events.jpg';
 import {
   createDeposit,
   checkDeposit,
+  cancelDeposit,
   fetchDepositHistory,
   type DepositOrder,
   type DepositCreateResponse,
@@ -173,6 +174,10 @@ export default function DepositPage() {
   }, []);
 
   const handleNewDeposit = () => {
+    // Hủy đơn pending trong DB trước khi reset UI
+    if (currentDeposit && currentDeposit.deposit.status !== 1) {
+      cancelDeposit(currentDeposit.deposit.id, user!.id).catch(() => {/* ignore */});
+    }
     setStep(1);
     setAmount(0);
     setCustomAmount('');
