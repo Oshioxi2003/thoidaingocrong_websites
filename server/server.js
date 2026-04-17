@@ -516,8 +516,15 @@ app.get('/api/users', requireAdmin, async (req, res) => {
     const params = [];
 
     if (search) {
-      sql += ' AND (username LIKE ? OR email LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      const searchNum = Number(search);
+      if (!isNaN(searchNum) && String(searchNum) === search.trim()) {
+        // Tìm theo ID chính xác hoặc theo tên/email
+        sql += ' AND (id = ? OR username LIKE ? OR email LIKE ?)';
+        params.push(searchNum, `%${search}%`, `%${search}%`);
+      } else {
+        sql += ' AND (username LIKE ? OR email LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`);
+      }
     }
     if (role === 'admin') {
       sql += ' AND is_admin = 1';
@@ -809,6 +816,14 @@ app.post('/api/auth/register', async (req, res) => {
     if (!captchaResult.success) {
       return res.status(403).json({ error: captchaResult.error || 'Xác minh reCAPTCHA thất bại' });
     }
+    // Validate username: chỉ cho phép chữ cái và số, không kí tự đặc biệt
+    if (!/^[a-zA-Z0-9]+$/.test(username)) {
+      return res.status(400).json({ error: 'Tên tài khoản chỉ được chứa chữ cái và số, không dấu cách hoặc kí tự đặc biệt' });
+    }
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ error: 'Tên tài khoản phải từ 3-20 kí tự' });
+    }
+
     // Kiểm tra username đã tồn tại
     const [existUser] = await pool.query('SELECT id FROM account WHERE username = ?', [username]);
     if (existUser.length > 0) {
@@ -856,11 +871,12 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(403).json({ error: captchaResult.error || 'Xác minh reCAPTCHA thất bại' });
     }
 
-    // Tìm account theo email hoặc username
-    const [rows] = await pool.query(
-      'SELECT * FROM account WHERE email = ? OR username = ?',
-      [loginId, loginId]
-    );
+    // Tìm account — ưu tiên username trước, sau đó mới tìm email
+    // (Tránh bug: username của user A trùng email của user B → trả sai account)
+    let [rows] = await pool.query('SELECT * FROM account WHERE username = ? LIMIT 1', [loginId]);
+    if (rows.length === 0) {
+      [rows] = await pool.query('SELECT * FROM account WHERE email = ? LIMIT 1', [loginId]);
+    }
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Tài khoản hoặc mật khẩu không đúng' });
     }
@@ -1643,7 +1659,11 @@ app.get('/api/top-server', async (req, res) => {
     const LIMIT = 50;
 
     // ---- TOP NHIỆM VỤ ----
-    const [taskRows] = await pool.query('SELECT name, data_task FROM player');
+    const [taskRows] = await pool.query(
+      `SELECT p.name, p.data_task FROM player p
+       JOIN account a ON p.account_id = a.id
+       WHERE a.ban = 0 AND a.is_admin = 0`
+    );
     const taskList = [];
     for (const row of taskRows) {
       try {
@@ -1670,6 +1690,7 @@ app.get('/api/top-server', async (req, res) => {
       ) as total_deposit
        FROM player p 
        JOIN account a ON p.account_id = a.id 
+       WHERE a.ban = 0 AND a.is_admin = 0
        HAVING total_deposit > 0
        ORDER BY total_deposit DESC 
        LIMIT ?`, [LIMIT]
@@ -1683,7 +1704,11 @@ app.get('/api/top-server', async (req, res) => {
     // ---- TOP SỨC MẠNH ----
     // data_point[1] = sức mạnh (HP/power tổng)
     // pet: phần tử thứ 2 (index 1) trong mảng pet chứa stats, stats[1] = pet power
-    const [powerRows] = await pool.query('SELECT name, data_point, pet FROM player');
+    const [powerRows] = await pool.query(
+      `SELECT p.name, p.data_point, p.pet FROM player p
+       JOIN account a ON p.account_id = a.id
+       WHERE a.ban = 0 AND a.is_admin = 0`
+    );
     const powerList = [];
     for (const row of powerRows) {
       try {

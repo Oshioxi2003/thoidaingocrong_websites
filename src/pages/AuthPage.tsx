@@ -59,6 +59,8 @@ export default function AuthPage() {
 
     if (mode === 'register') {
       if (!form.name.trim()) errs.name = 'Tên không được để trống';
+      else if (!/^[a-zA-Z0-9]+$/.test(form.name)) errs.name = 'Chỉ cho phép chữ cái và số, không dấu cách hoặc kí tự đặc biệt';
+      else if (form.name.length < 3 || form.name.length > 20) errs.name = 'Tên tài khoản phải từ 3-20 kí tự';
       if (form.password !== form.confirmPassword) errs.confirmPassword = 'Mật khẩu không khớp';
     }
 

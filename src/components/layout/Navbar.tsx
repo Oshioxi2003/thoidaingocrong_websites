@@ -50,10 +50,11 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
   // Refresh user stats (cash, vàng, vip) từ server khi mở dropdown
   useEffect(() => {
     if (!dropdownOpen || !user) return;
+    const currentUserId = user.id;
     fetch(`/api/auth/me?user_id=${user.id}`)
       .then(res => res.json())
       .then(data => {
-        if (data.user) {
+        if (data.user && data.user.id === currentUserId) {
           const updated = { ...user, ...data.user };
           setUser(updated);
           localStorage.setItem('user', JSON.stringify(updated));
@@ -62,6 +63,21 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
       .catch(() => { /* ignore */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dropdownOpen]);
+
+  // Sync user across tabs — khi tab khác login/logout, cập nhật tab này
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user') {
+        if (e.newValue) {
+          try { setUser(JSON.parse(e.newValue)); } catch { setUser(null); }
+        } else {
+          setUser(null);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {

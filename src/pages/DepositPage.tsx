@@ -176,7 +176,7 @@ export default function DepositPage() {
   const handleNewDeposit = () => {
     // Hủy đơn pending trong DB trước khi reset UI
     if (currentDeposit && currentDeposit.deposit.status !== 1) {
-      cancelDeposit(currentDeposit.deposit.id, user!.id).catch(() => {/* ignore */});
+      cancelDeposit(currentDeposit.deposit.id, user!.id).catch(() => {/* ignore */ });
     }
     setStep(1);
     setAmount(0);
@@ -228,19 +228,17 @@ export default function DepositPage() {
             {[1, 2, 3].map((s) => (
               <div key={s} className="flex items-center gap-2">
                 <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 ${
-                    step >= s
+                  className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 ${step >= s
                       ? 'gradient-fire text-primary-foreground shadow-glow'
                       : 'border border-border bg-card text-muted-foreground'
-                  }`}
+                    }`}
                 >
                   {step > s ? <Check size={16} /> : s}
                 </div>
                 {s < 3 && (
                   <div
-                    className={`h-0.5 w-8 rounded transition-colors duration-300 ${
-                      step > s ? 'bg-primary' : 'bg-border'
-                    }`}
+                    className={`h-0.5 w-8 rounded transition-colors duration-300 ${step > s ? 'bg-primary' : 'bg-border'
+                      }`}
                   />
                 )}
               </div>
@@ -295,7 +293,7 @@ export default function DepositPage() {
                       color="from-purple-500 to-violet-600"
                       icon={<Crown size={16} />}
                       rewards={[
-                        '1 Set Thần Linh',
+                        '10 ngọc rồng 3 sao + 100k ngọc xanh',
                         '30 Đá bảo vệ',
                       ]}
                     />
@@ -306,246 +304,244 @@ export default function DepositPage() {
 
             {/* Center - Main Steps */}
             <div className="w-full max-w-lg flex-shrink-0">
-          {/* Step 1: Chọn mệnh giá */}
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <AnimatedSection className="mx-auto max-w-lg">
-                  <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8">
-                    <div className="mb-6 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-fire">
-                        <Wallet size={20} className="text-primary-foreground" />
-                      </div>
-                      <div>
-                        <h3 className="font-display text-lg font-semibold text-foreground">Chọn số tiền nạp</h3>
-                        <p className="text-sm text-muted-foreground">Tỷ giá: 1 VND = 1 Cash</p>
-                      </div>
-                    </div>
+              {/* Step 1: Chọn mệnh giá */}
+              <AnimatePresence mode="wait">
+                {step === 1 && (
+                  <motion.div
+                    key="step1"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <AnimatedSection className="mx-auto max-w-lg">
+                      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8">
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-fire">
+                            <Wallet size={20} className="text-primary-foreground" />
+                          </div>
+                          <div>
+                            <h3 className="font-display text-lg font-semibold text-foreground">Chọn số tiền nạp</h3>
+                            <p className="text-sm text-muted-foreground">Tỷ giá: 1 VND = 1 Cash</p>
+                          </div>
+                        </div>
 
-                    {/* Preset buttons */}
-                    <div className="mb-6 grid grid-cols-3 gap-3">
-                      {PRESET_AMOUNTS.map((preset) => (
-                        <button
-                          key={preset.value}
-                          onClick={() => handleSelectAmount(preset.value)}
-                          className={`relative overflow-hidden rounded-xl border py-4 text-center font-display text-sm font-semibold transition-all duration-200 hover:scale-[1.03] ${
-                            amount === preset.value && !customAmount
-                              ? 'border-primary bg-primary/10 text-primary shadow-glow'
-                              : 'border-border bg-background text-foreground hover:border-primary/30'
-                          }`}
-                        >
-                          <span className="text-lg">{preset.label}</span>
-                          <br />
-                          <span className="text-xs text-muted-foreground">{formatVND(preset.value)}đ</span>
-                          {amount === preset.value && !customAmount && (
-                            <motion.div
-                              layoutId="amount-check"
-                              className="absolute right-1.5 top-1.5"
+                        {/* Preset buttons */}
+                        <div className="mb-6 grid grid-cols-3 gap-3">
+                          {PRESET_AMOUNTS.map((preset) => (
+                            <button
+                              key={preset.value}
+                              onClick={() => handleSelectAmount(preset.value)}
+                              className={`relative overflow-hidden rounded-xl border py-4 text-center font-display text-sm font-semibold transition-all duration-200 hover:scale-[1.03] ${amount === preset.value && !customAmount
+                                  ? 'border-primary bg-primary/10 text-primary shadow-glow'
+                                  : 'border-border bg-background text-foreground hover:border-primary/30'
+                                }`}
                             >
-                              <CheckCircle2 size={16} className="text-primary" />
-                            </motion.div>
+                              <span className="text-lg">{preset.label}</span>
+                              <br />
+                              <span className="text-xs text-muted-foreground">{formatVND(preset.value)}đ</span>
+                              {amount === preset.value && !customAmount && (
+                                <motion.div
+                                  layoutId="amount-check"
+                                  className="absolute right-1.5 top-1.5"
+                                >
+                                  <CheckCircle2 size={16} className="text-primary" />
+                                </motion.div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Custom amount */}
+                        <div className="mb-6">
+                          <label className="mb-2 block text-sm text-muted-foreground">Hoặc nhập số tiền tuỳ ý</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={customAmount}
+                              onChange={(e) => handleCustomAmount(e.target.value)}
+                              placeholder="Nhập số tiền (tối thiểu 10,000)"
+                              className="w-full rounded-xl border border-border bg-background py-3 px-4 pr-14 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">VND</span>
+                          </div>
+                        </div>
+
+                        {/* Current balance */}
+                        <div className="mb-6 space-y-2">
+                          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Số dư Cash</span>
+                            <span className="font-display text-sm font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                          </div>
+                          <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Số dư VND</span>
+                            <span className="font-display text-sm font-semibold text-emerald-500">{formatVND(user.vnd || 0)} VND</span>
+                          </div>
+                        </div>
+
+                        {checkResult && checkResult.status === 'error' && (
+                          <div className="mb-4 flex items-center gap-2 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+                            <X size={16} /> {checkResult.message}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={handleCreateDeposit}
+                          disabled={amount < 10000 || createMutation.isPending}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl gradient-fire py-3.5 font-display text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                        >
+                          {createMutation.isPending ? (
+                            <><Loader2 size={16} className="animate-spin" /> Đang xử lý...</>
+                          ) : (
+                            <>Tiếp tục <ArrowRight size={16} /></>
                           )}
                         </button>
-                      ))}
-                    </div>
-
-                    {/* Custom amount */}
-                    <div className="mb-6">
-                      <label className="mb-2 block text-sm text-muted-foreground">Hoặc nhập số tiền tuỳ ý</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={customAmount}
-                          onChange={(e) => handleCustomAmount(e.target.value)}
-                          placeholder="Nhập số tiền (tối thiểu 10,000)"
-                          className="w-full rounded-xl border border-border bg-background py-3 px-4 pr-14 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">VND</span>
                       </div>
-                    </div>
+                    </AnimatedSection>
+                  </motion.div>
+                )}
 
-                    {/* Current balance */}
-                    <div className="mb-6 space-y-2">
-                      <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <span className="text-sm text-muted-foreground">Số dư Cash</span>
-                        <span className="font-display text-sm font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                {/* Step 2: Thông tin chuyển khoản */}
+                {step === 2 && currentDeposit && (
+                  <motion.div
+                    key="step2"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <AnimatedSection className="mx-auto max-w-lg">
+                      <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8">
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-fire">
+                            <CreditCard size={20} className="text-primary-foreground" />
+                          </div>
+                          <div>
+                            <h3 className="font-display text-lg font-semibold text-foreground">Thông tin chuyển khoản</h3>
+                            <p className="text-sm text-muted-foreground">Chuyển khoản đúng nội dung bên dưới</p>
+                          </div>
+                        </div>
+
+                        {/* QR Code VietQR */}
+                        <div className="mb-6 flex flex-col items-center">
+                          <div className="rounded-2xl border border-border bg-white p-3">
+                            <img
+                              src={`https://img.vietqr.io/image/${currentDeposit.bank.bank}-${currentDeposit.bank.accountNumber}-compact.png?amount=${currentDeposit.deposit.amount}&addInfo=${currentDeposit.deposit.transfer_code}&accountName=${encodeURIComponent(currentDeposit.bank.accountName)}`}
+                              alt="QR Code chuyển khoản"
+                              className="h-52 w-52 object-contain"
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">Quét mã QR bằng app ngân hàng</p>
+                        </div>
+
+                        {/* Bank info */}
+                        <div className="mb-6 space-y-3">
+                          <InfoRow label="Ngân hàng" value={currentDeposit.bank.bank} onCopy={() => handleCopy(currentDeposit.bank.bank, 'bank')} copied={copied === 'bank'} />
+                          <InfoRow label="Chủ tài khoản" value={currentDeposit.bank.accountName} onCopy={() => handleCopy(currentDeposit.bank.accountName, 'name')} copied={copied === 'name'} />
+                          <InfoRow label="Số tài khoản" value={currentDeposit.bank.accountNumber} onCopy={() => handleCopy(currentDeposit.bank.accountNumber, 'stk')} copied={copied === 'stk'} highlight />
+                          <InfoRow label="Số tiền" value={`${formatVND(currentDeposit.deposit.amount)} VND`} onCopy={() => handleCopy(String(currentDeposit.deposit.amount), 'amount')} copied={copied === 'amount'} highlight />
+                          <InfoRow label="Nội dung CK" value={currentDeposit.deposit.transfer_code} onCopy={() => handleCopy(currentDeposit.deposit.transfer_code, 'code')} copied={copied === 'code'} highlight important />
+                        </div>
+
+                        {/* Warning */}
+                        <div className="mb-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-1">
+                          <p className="text-sm text-yellow-500">
+                            ⚠️ Vui lòng chuyển đúng <strong>số tiền</strong> và <strong>nội dung chuyển khoản</strong> (bao gồm mã số) để hệ thống tự động xác nhận.
+                          </p>
+                          <p className="text-xs text-yellow-500/70">
+                            ⏰ Đơn nạp sẽ tự động hết hạn sau 24 giờ nếu chưa chuyển khoản.
+                          </p>
+                        </div>
+
+                        {/* Check result */}
+                        <AnimatePresence>
+                          {checkResult && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className={`mb-4 flex items-center gap-2 rounded-xl p-3 text-sm font-medium ${checkResult.status === 'success'
+                                  ? 'bg-green-500/10 text-green-500'
+                                  : checkResult.status === 'pending'
+                                    ? 'bg-yellow-500/10 text-yellow-500'
+                                    : 'bg-destructive/10 text-destructive'
+                                }`}
+                            >
+                              {checkResult.status === 'success' ? <CheckCircle2 size={16} /> : checkResult.status === 'pending' ? <Clock size={16} /> : <X size={16} />}
+                              {checkResult.message}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleNewDeposit}
+                            className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            Huỷ
+                          </button>
+                          <button
+                            onClick={handleStartCheck}
+                            disabled={checkMutation.isPending || autoChecking}
+                            className="flex flex-[2] items-center justify-center gap-2 rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02] disabled:opacity-70"
+                          >
+                            {autoChecking ? (
+                              <><Loader2 size={16} className="animate-spin" /> Đang kiểm tra...</>
+                            ) : checkMutation.isPending ? (
+                              <><Loader2 size={16} className="animate-spin" /> Kiểm tra...</>
+                            ) : (
+                              <><Check size={16} /> Đã chuyển khoản</>
+                            )}
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-                        <span className="text-sm text-muted-foreground">Số dư VND</span>
-                        <span className="font-display text-sm font-semibold text-emerald-500">{formatVND(user.vnd || 0)} VND</span>
-                      </div>
-                    </div>
+                    </AnimatedSection>
+                  </motion.div>
+                )}
 
-                    {checkResult && checkResult.status === 'error' && (
-                      <div className="mb-4 flex items-center gap-2 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
-                        <X size={16} /> {checkResult.message}
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleCreateDeposit}
-                      disabled={amount < 10000 || createMutation.isPending}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl gradient-fire py-3.5 font-display text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
-                    >
-                      {createMutation.isPending ? (
-                        <><Loader2 size={16} className="animate-spin" /> Đang xử lý...</>
-                      ) : (
-                        <>Tiếp tục <ArrowRight size={16} /></>
-                      )}
-                    </button>
-                  </div>
-                </AnimatedSection>
-              </motion.div>
-            )}
-
-            {/* Step 2: Thông tin chuyển khoản */}
-            {step === 2 && currentDeposit && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <AnimatedSection className="mx-auto max-w-lg">
-                  <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8">
-                    <div className="mb-6 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-fire">
-                        <CreditCard size={20} className="text-primary-foreground" />
-                      </div>
-                      <div>
-                        <h3 className="font-display text-lg font-semibold text-foreground">Thông tin chuyển khoản</h3>
-                        <p className="text-sm text-muted-foreground">Chuyển khoản đúng nội dung bên dưới</p>
-                      </div>
-                    </div>
-
-                    {/* QR Code VietQR */}
-                    <div className="mb-6 flex flex-col items-center">
-                      <div className="rounded-2xl border border-border bg-white p-3">
-                        <img
-                          src={`https://img.vietqr.io/image/${currentDeposit.bank.bank}-${currentDeposit.bank.accountNumber}-compact.png?amount=${currentDeposit.deposit.amount}&addInfo=${currentDeposit.deposit.transfer_code}&accountName=${encodeURIComponent(currentDeposit.bank.accountName)}`}
-                          alt="QR Code chuyển khoản"
-                          className="h-52 w-52 object-contain"
-                        />
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">Quét mã QR bằng app ngân hàng</p>
-                    </div>
-
-                    {/* Bank info */}
-                    <div className="mb-6 space-y-3">
-                      <InfoRow label="Ngân hàng" value={currentDeposit.bank.bank} onCopy={() => handleCopy(currentDeposit.bank.bank, 'bank')} copied={copied === 'bank'} />
-                      <InfoRow label="Chủ tài khoản" value={currentDeposit.bank.accountName} onCopy={() => handleCopy(currentDeposit.bank.accountName, 'name')} copied={copied === 'name'} />
-                      <InfoRow label="Số tài khoản" value={currentDeposit.bank.accountNumber} onCopy={() => handleCopy(currentDeposit.bank.accountNumber, 'stk')} copied={copied === 'stk'} highlight />
-                      <InfoRow label="Số tiền" value={`${formatVND(currentDeposit.deposit.amount)} VND`} onCopy={() => handleCopy(String(currentDeposit.deposit.amount), 'amount')} copied={copied === 'amount'} highlight />
-                      <InfoRow label="Nội dung CK" value={currentDeposit.deposit.transfer_code} onCopy={() => handleCopy(currentDeposit.deposit.transfer_code, 'code')} copied={copied === 'code'} highlight important />
-                    </div>
-
-                    {/* Warning */}
-                    <div className="mb-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-1">
-                      <p className="text-sm text-yellow-500">
-                        ⚠️ Vui lòng chuyển đúng <strong>số tiền</strong> và <strong>nội dung chuyển khoản</strong> (bao gồm mã số) để hệ thống tự động xác nhận.
-                      </p>
-                      <p className="text-xs text-yellow-500/70">
-                        ⏰ Đơn nạp sẽ tự động hết hạn sau 24 giờ nếu chưa chuyển khoản.
-                      </p>
-                    </div>
-
-                    {/* Check result */}
-                    <AnimatePresence>
-                      {checkResult && (
+                {/* Step 3: Thành công */}
+                {step === 3 && (
+                  <motion.div
+                    key="step3"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <AnimatedSection className="mx-auto max-w-lg">
+                      <div className="rounded-2xl border border-green-500/30 bg-card/90 backdrop-blur-sm p-8 text-center">
                         <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className={`mb-4 flex items-center gap-2 rounded-xl p-3 text-sm font-medium ${
-                            checkResult.status === 'success'
-                              ? 'bg-green-500/10 text-green-500'
-                              : checkResult.status === 'pending'
-                              ? 'bg-yellow-500/10 text-yellow-500'
-                              : 'bg-destructive/10 text-destructive'
-                          }`}
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+                          className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10"
                         >
-                          {checkResult.status === 'success' ? <CheckCircle2 size={16} /> : checkResult.status === 'pending' ? <Clock size={16} /> : <X size={16} />}
-                          {checkResult.message}
+                          <Sparkles size={32} className="text-green-500" />
                         </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleNewDeposit}
-                        className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        Huỷ
-                      </button>
-                      <button
-                        onClick={handleStartCheck}
-                        disabled={checkMutation.isPending || autoChecking}
-                        className="flex flex-[2] items-center justify-center gap-2 rounded-xl gradient-fire py-3 font-display text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02] disabled:opacity-70"
-                      >
-                        {autoChecking ? (
-                          <><Loader2 size={16} className="animate-spin" /> Đang kiểm tra...</>
-                        ) : checkMutation.isPending ? (
-                          <><Loader2 size={16} className="animate-spin" /> Kiểm tra...</>
-                        ) : (
-                          <><Check size={16} /> Đã chuyển khoản</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </AnimatedSection>
-              </motion.div>
-            )}
-
-            {/* Step 3: Thành công */}
-            {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                <AnimatedSection className="mx-auto max-w-lg">
-                  <div className="rounded-2xl border border-green-500/30 bg-card/90 backdrop-blur-sm p-8 text-center">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
-                      className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10"
-                    >
-                      <Sparkles size={32} className="text-green-500" />
-                    </motion.div>
-                    <h3 className="mb-2 font-display text-xl font-semibold text-green-500">Nạp thành công!</h3>
-                    <p className="mb-4 text-muted-foreground">{checkResult?.message}</p>
-                    <div className="mb-6 space-y-2">
-                      <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <span className="text-sm text-muted-foreground">Số dư Cash: </span>
-                        <span className="font-display text-lg font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                        <h3 className="mb-2 font-display text-xl font-semibold text-green-500">Nạp thành công!</h3>
+                        <p className="mb-4 text-muted-foreground">{checkResult?.message}</p>
+                        <div className="mb-6 space-y-2">
+                          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Số dư Cash: </span>
+                            <span className="font-display text-lg font-semibold text-primary">{formatVND(user.cash)} Cash</span>
+                          </div>
+                          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Số dư VND: </span>
+                            <span className="font-display text-lg font-semibold text-emerald-500">{formatVND(user.vnd || 0)} VND</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleNewDeposit}
+                          className="gradient-fire rounded-xl px-8 py-3 font-display text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02]"
+                        >
+                          Nạp thêm
+                        </button>
                       </div>
-                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-                        <span className="text-sm text-muted-foreground">Số dư VND: </span>
-                        <span className="font-display text-lg font-semibold text-emerald-500">{formatVND(user.vnd || 0)} VND</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleNewDeposit}
-                      className="gradient-fire rounded-xl px-8 py-3 font-display text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02]"
-                    >
-                      Nạp thêm
-                    </button>
-                  </div>
-                </AnimatedSection>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                    </AnimatedSection>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Right Panel - Mốc nạp lớn */}
@@ -621,7 +617,7 @@ export default function DepositPage() {
                   <MilestoneCard amount="50K" color="from-slate-500 to-slate-600" icon={<Star size={16} />} rewards={['Nhận đệ tự thường']} />
                   <MilestoneCard amount="100K" color="from-green-500 to-emerald-600" icon={<Shield size={16} />} rewards={['10 Đá bảo vệ (1143)', '100 Đá thạch anh tím (224)']} />
                   <MilestoneCard amount="200K" color="from-blue-500 to-indigo-600" icon={<Zap size={16} />} rewards={['Cải trang: 20% HP KI SD', '5% Húp máu']} />
-                  <MilestoneCard amount="500K" color="from-purple-500 to-violet-600" icon={<Crown size={16} />} rewards={['1 Set Thần Linh', '30 Đá bảo vệ']} />
+                  <MilestoneCard amount="500K" color="from-purple-500 to-violet-600" icon={<Crown size={16} />} rewards={['10 viên 3 sao + 100k ngọc xanh', '30 Đá bảo vệ']} />
                   <MilestoneCard amount="1.000K" color="from-amber-500 to-orange-600" icon={<Swords size={16} />} rewards={['Cải trang: 25% HP KI SD', '10% Húp máu', '10% Sức đánh chí mạng', '+ Set TL + 50 Đá bảo vệ']} />
                   <MilestoneCard amount="2.000K" color="from-rose-500 to-pink-600" icon={<Gem size={16} />} rewards={['Cải trang: 30% HP KI SD', '10% Húp máu', '15% Sức đánh chí mạng', '+ Set TL + 100 Đá bảo vệ']} />
                   <MilestoneCard amount="5.000K" color="from-yellow-400 to-amber-500" icon={<Crown size={16} />} rewards={['Cải trang: 35% HP KI SD', '15% Húp máu', '15% Sức đánh chí mạng', 'Kháng lạnh', '+ Set TL + 999 Mảnh Thiên Sứ', '+ 500 Đá bảo vệ']} legendary />
@@ -690,11 +686,10 @@ function MilestoneCard({ amount, color, icon, rewards, legendary }: {
   legendary?: boolean;
 }) {
   return (
-    <div className={`relative rounded-xl border overflow-hidden transition-all duration-300 hover:scale-[1.02] ${
-      legendary
+    <div className={`relative rounded-xl border overflow-hidden transition-all duration-300 hover:scale-[1.02] ${legendary
         ? 'border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
         : 'border-border/50'
-    }`}>
+      }`}>
       {legendary && (
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-amber-500/5 pointer-events-none" />
       )}
@@ -707,9 +702,8 @@ function MilestoneCard({ amount, color, icon, rewards, legendary }: {
       </div>
       <div className="px-3 py-2.5 space-y-1 bg-background/50">
         {rewards.map((r, i) => (
-          <p key={i} className={`text-xs leading-relaxed ${
-            r.startsWith('+') ? 'text-muted-foreground' : 'text-foreground/90'
-          }`}>
+          <p key={i} className={`text-xs leading-relaxed ${r.startsWith('+') ? 'text-muted-foreground' : 'text-foreground/90'
+            }`}>
             <span className="text-primary/70 mr-1">•</span>{r}
           </p>
         ))}
@@ -728,13 +722,12 @@ function InfoRow({ label, value, onCopy, copied, highlight, important }: {
   important?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
-      important
+    <div className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${important
         ? 'border-primary/40 bg-primary/5'
         : highlight
-        ? 'border-border bg-muted/30'
-        : 'border-border bg-background'
-    }`}>
+          ? 'border-border bg-muted/30'
+          : 'border-border bg-background'
+      }`}>
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className={`font-mono text-sm font-semibold ${important ? 'text-primary' : 'text-foreground'}`}>
