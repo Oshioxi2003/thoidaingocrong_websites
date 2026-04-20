@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Users, Gift, ClipboardCheck, Package, Wallet,
   ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock,
-  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert
+  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert, SlidersHorizontal, ArrowDownUp, History
 } from 'lucide-react';
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
@@ -13,8 +13,10 @@ import {
   fetchGiftcodes, createGiftcode, deleteGiftcode, fetchItemOptions, fetchGiftcodeItems,
   fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
   fetchAdminDeposits, fetchDepositStats, approveDeposit, getCurrentUser,
+  fetchTransactions, fetchTransactionColumns,
   type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate,
-  type ItemOption, type GiftcodeDetailItem, type DepositOrder, type DepositStats
+  type ItemOption, type GiftcodeDetailItem, type DepositOrder, type DepositStats,
+  type HistoryTransaction
 } from '@/lib/api';
 
 /* ============ SHARED PAGINATION ============ */
@@ -81,7 +83,7 @@ function PerPageSelector({ perPage, onChange }: { perPage: number; onChange: (n:
   );
 }
 
-type Tab = 'posts' | 'approval' | 'users' | 'giftcodes' | 'inventory' | 'deposits';
+type Tab = 'posts' | 'approval' | 'users' | 'giftcodes' | 'inventory' | 'deposits' | 'transactions';
 
 const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'posts', label: 'Bài viết', icon: FileText },
@@ -90,6 +92,7 @@ const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
   { key: 'giftcodes', label: 'Giftcode', icon: Gift },
   { key: 'inventory', label: 'Hành trang', icon: Package },
   { key: 'deposits', label: 'Dòng tiền', icon: Wallet },
+  { key: 'transactions', label: 'Giao dịch', icon: History },
 ];
 
 export default function AdminPage() {
@@ -204,6 +207,7 @@ export default function AdminPage() {
           {activeTab === 'giftcodes' && <GiftcodesTab />}
           {activeTab === 'inventory' && <InventoryTab />}
           {activeTab === 'deposits' && <DepositsTab />}
+          {activeTab === 'transactions' && <TransactionsTab />}
         </motion.div>
       </main>
     </div>
@@ -1324,12 +1328,13 @@ function InventoryTab() {
   const [perPage, setPerPage] = useState(20);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('');
   const queryClient = useQueryClient();
 
   // Fetch players
   const { data: playersData, isLoading: loadingPlayers } = useQuery({
-    queryKey: ['admin-players', search, page, perPage],
-    queryFn: () => fetchPlayers({ search: search || undefined, page, limit: perPage }),
+    queryKey: ['admin-players', search, page, perPage, sortBy],
+    queryFn: () => fetchPlayers({ search: search || undefined, page, limit: perPage, sort: sortBy || undefined }),
   });
 
   // Fetch inventory for selected player
@@ -1351,6 +1356,7 @@ function InventoryTab() {
 
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
   const handlePerPage = (n: number) => { setPerPage(n); setPage(1); };
+  const handleSort = (s: string) => { setSortBy(prev => prev === s ? '' : s); setPage(1); };
 
   // Fill grid to 20 slots for visual
   const GRID_SLOTS = 20;
@@ -1385,6 +1391,37 @@ function InventoryTab() {
           )}
         </div>
         <PerPageSelector perPage={perPage} onChange={handlePerPage} />
+      </div>
+
+      {/* Sort Filters */}
+      <div className="mb-4 flex items-center gap-2">
+        <SlidersHorizontal size={14} className="text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Sắp xếp:</span>
+        {[
+          { key: 'gold_desc', label: '🪙 Vàng cao → thấp', icon: <ArrowDownUp size={12} /> },
+          { key: 'item457_desc', label: '🪨 Item 457 cao → thấp', icon: <ArrowDownUp size={12} /> },
+        ].map(f => (
+          <button
+            key={f.key}
+            onClick={() => handleSort(f.key)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              sortBy === f.key
+                ? 'gradient-fire text-primary-foreground shadow-glow'
+                : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+            }`}
+          >
+            {f.icon} {f.label}
+          </button>
+        ))}
+        {sortBy && (
+          <button
+            onClick={() => { setSortBy(''); setPage(1); }}
+            className="rounded-full px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            title="Xóa bộ lọc"
+          >
+            <X size={12} />
+          </button>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
@@ -2031,6 +2068,115 @@ function DepositsTab() {
             </table>
           </div>
           <Pagination page={page} totalPages={totalPages} total={totalDeposits} perPage={perPage} onPageChange={setPage} label="giao dịch" />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============ TRANSACTIONS ============ */
+function TransactionsTab() {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(50);
+
+  // Fetch columns (structure)
+  const { data: columnsData } = useQuery({
+    queryKey: ['admin-transaction-columns'],
+    queryFn: fetchTransactionColumns,
+    staleTime: 600000,
+  });
+
+  // Fetch transactions data
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-transactions', search, page, perPage],
+    queryFn: () => fetchTransactions({ search: search || undefined, page, limit: perPage }),
+  });
+
+  const columns = columnsData?.data || [];
+  const transactions = data?.data || [];
+  const totalTransactions = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+
+  const handleSearch = (v: string) => { setSearch(v); setPage(1); };
+  const handlePerPage = (n: number) => { setPerPage(n); setPage(1); };
+
+  // Format cell value for display
+  const formatCell = (value: unknown, col: string): string => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'number' && col.toLowerCase().includes('time') && value > 1000000000000) {
+      return new Date(value).toLocaleString('vi-VN');
+    }
+    if (typeof value === 'string' && col.toLowerCase().includes('time') && !isNaN(Date.parse(value))) {
+      return new Date(value).toLocaleString('vi-VN');
+    }
+    if (typeof value === 'number') return value.toLocaleString();
+    if (typeof value === 'string' && value.length > 100) return value.substring(0, 100) + '…';
+    return String(value);
+  };
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="font-display text-2xl font-bold text-foreground">Lịch sử giao dịch</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tổng cộng <strong className="text-foreground">{totalTransactions.toLocaleString()}</strong> giao dịch
+          </p>
+        </div>
+        <PerPageSelector perPage={perPage} onChange={handlePerPage} />
+      </div>
+
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+        <Search size={18} className="text-muted-foreground" />
+        <input
+          value={search}
+          onChange={e => handleSearch(e.target.value)}
+          placeholder="Tìm theo tên người chơi hoặc nội dung..."
+          className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        />
+        {search && (
+          <button onClick={() => handleSearch('')} className="text-muted-foreground hover:text-foreground">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="py-20 text-center text-muted-foreground">Đang tải...</div>
+      ) : transactions.length === 0 ? (
+        <div className="py-20 text-center text-muted-foreground">Không tìm thấy giao dịch nào.</div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  {columns.map(col => (
+                    <th key={col} className="whitespace-nowrap px-4 py-3 text-left font-semibold text-muted-foreground text-xs">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx: HistoryTransaction, idx: number) => (
+                  <tr key={tx.id || idx} className="border-b border-border/50 transition-colors hover:bg-muted/30">
+                    {columns.map(col => (
+                      <td
+                        key={col}
+                        className="whitespace-nowrap px-4 py-2.5 text-xs text-foreground max-w-[250px] truncate"
+                        title={String(tx[col] ?? '')}
+                      >
+                        {formatCell(tx[col], col)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} totalPages={totalPages} total={totalTransactions} perPage={perPage} onPageChange={setPage} label="giao dịch" />
         </>
       )}
     </div>

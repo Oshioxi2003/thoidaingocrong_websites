@@ -1342,10 +1342,10 @@ async function parseNROItems(itemsBagJson) {
   return result;
 }
 
-// GET /api/admin/players — Tìm kiếm nhân vật theo tên hoặc tên account
+// GET /api/admin/players — Tìm kiếm nhân vật theo tên hoặc tên account, hỗ trợ sắp xếp
 app.get('/api/admin/players', requireAdmin, async (req, res) => {
   try {
-    const { search, page = 1, limit = 20 } = req.query;
+    const { search, page = 1, limit = 20, sort } = req.query;
     let sql = 'SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name FROM player p LEFT JOIN account a ON p.account_id = a.id WHERE 1=1';
     const params = [];
 
@@ -1354,7 +1354,54 @@ app.get('/api/admin/players', requireAdmin, async (req, res) => {
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    sql += ' ORDER BY p.id ASC';
+    // Sắp xếp theo item 457 cần xử lý JS-side (items_bag phức tạp)
+    if (sort === 'item457_desc') {
+      // Fetch tất cả kết quả, parse items_bag để tìm item 457, sort và paginate bằng JS
+      sql += ' ORDER BY p.id ASC';
+      const countSql = sql.replace('SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name', 'SELECT COUNT(*) as total');
+      const [countRows] = await pool.query(countSql, params);
+      const total = countRows[0].total;
+
+      // Lấy tất cả kèm items_bag
+      const sqlAll = sql.replace(
+        'SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name',
+        'SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, p.items_bag, a.username as account_name'
+      );
+      const [allRows] = await pool.query(sqlAll, params);
+
+      // Parse items_bag tìm item 457 quantity
+      for (const row of allRows) {
+        let qty457 = 0;
+        try {
+          const rawItems = JSON.parse(row.items_bag || '[]');
+          for (const raw of rawItems) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed[0] === 457) { qty457 += (parsed[1] || 0); }
+            } catch { continue; }
+          }
+        } catch { /* ignore */ }
+        row._item457 = qty457;
+        delete row.items_bag; // Không trả items_bag cho client
+      }
+
+      // Sort by item 457 quantity DESC
+      allRows.sort((a, b) => b._item457 - a._item457);
+
+      const offset = (Number(page) - 1) * Number(limit);
+      const paged = allRows.slice(offset, offset + Number(limit));
+      // Xóa _item457 temp field
+      for (const r of paged) delete r._item457;
+
+      return res.json({ data: paged, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
+    }
+
+    // Sắp xếp theo vàng (data_inventory[0]) — dùng MySQL JSON_EXTRACT
+    if (sort === 'gold_desc') {
+      sql += ' ORDER BY CAST(JSON_EXTRACT(p.data_inventory, "$[0]") AS UNSIGNED) DESC';
+    } else {
+      sql += ' ORDER BY p.id ASC';
+    }
 
     const countSql = sql.replace('SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name', 'SELECT COUNT(*) as total');
     const [countRows] = await pool.query(countSql, params);
@@ -1542,6 +1589,50 @@ app.get('/api/admin/giftcode-items/:id', requireAdmin, async (req, res) => {
     res.json({ data: enriched });
   } catch (err) {
     console.error('GET /api/admin/giftcode-items/:id error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// ======================== ADMIN — HISTORY TRANSACTION ========================
+
+// GET /api/admin/transactions — Lấy lịch sử giao dịch item
+app.get('/api/admin/transactions', requireAdmin, async (req, res) => {
+  try {
+    const { search, page = 1, limit = 50 } = req.query;
+    let sql = 'SELECT * FROM history_transaction WHERE 1=1';
+    const params = [];
+
+    if (search) {
+      // Tìm theo tên người chơi hoặc nội dung giao dịch
+      sql += ' AND (player1 LIKE ? OR player2 LIKE ? OR note LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    sql += ' ORDER BY id DESC';
+
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
+    const [countRows] = await pool.query(countSql, params);
+    const total = countRows[0].total;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(Number(limit), offset);
+
+    const [rows] = await pool.query(sql, params);
+    res.json({ data: rows, total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    console.error('GET /api/admin/transactions error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// GET /api/admin/transactions/columns — Lấy cấu trúc bảng history_transaction
+app.get('/api/admin/transactions/columns', requireAdmin, async (req, res) => {
+  try {
+    const [columns] = await pool.query('SHOW COLUMNS FROM history_transaction');
+    res.json({ data: columns.map(c => c.Field) });
+  } catch (err) {
+    console.error('GET /api/admin/transactions/columns error:', err);
     res.status(500).json({ error: 'Lỗi server' });
   }
 });

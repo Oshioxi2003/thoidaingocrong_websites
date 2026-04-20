@@ -383,11 +383,13 @@ export async function fetchPlayers(params?: {
   search?: string;
   page?: number;
   limit?: number;
+  sort?: string;
 }): Promise<PaginatedResponse<Player>> {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.page) q.set('page', String(params.page));
   if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.sort) q.set('sort', params.sort);
   return request<PaginatedResponse<Player>>(`/admin/players?${q.toString()}`);
 }
 
@@ -422,6 +424,27 @@ export async function fetchItemTemplates(params?: {
   if (params?.page) q.set('page', String(params.page));
   if (params?.limit) q.set('limit', String(params.limit));
   return request<PaginatedResponse<ItemTemplate>>(`/admin/item-templates?${q.toString()}`);
+}
+
+// ============ Admin — History Transaction API ============
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type HistoryTransaction = Record<string, any>;
+
+export async function fetchTransactions(params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<HistoryTransaction>> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.limit) q.set('limit', String(params.limit));
+  return request<PaginatedResponse<HistoryTransaction>>(`/admin/transactions?${q.toString()}`);
+}
+
+export async function fetchTransactionColumns(): Promise<{ data: string[] }> {
+  return request<{ data: string[] }>('/admin/transactions/columns');
 }
 
 // ============ Gallery API ============
