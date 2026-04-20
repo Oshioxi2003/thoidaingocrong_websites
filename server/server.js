@@ -518,12 +518,12 @@ app.get('/api/users', requireAdmin, async (req, res) => {
     if (search) {
       const searchNum = Number(search);
       if (!isNaN(searchNum) && String(searchNum) === search.trim()) {
-        // Tìm theo ID chính xác hoặc theo tên/email
-        sql += ' AND (id = ? OR username LIKE ? OR email LIKE ?)';
-        params.push(searchNum, `%${search}%`, `%${search}%`);
+        // Tìm theo ID chính xác hoặc theo tên/email/IP
+        sql += ' AND (id = ? OR username LIKE ? OR email LIKE ? OR ip_address LIKE ?)';
+        params.push(searchNum, `%${search}%`, `%${search}%`, `%${search}%`);
       } else {
-        sql += ' AND (username LIKE ? OR email LIKE ?)';
-        params.push(`%${search}%`, `%${search}%`);
+        sql += ' AND (username LIKE ? OR email LIKE ? OR ip_address LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
       }
     }
     if (role === 'admin') {
@@ -1346,7 +1346,7 @@ async function parseNROItems(itemsBagJson) {
 app.get('/api/admin/players', requireAdmin, async (req, res) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
-    let sql = 'SELECT id, name, account_id, head FROM player WHERE 1=1';
+    let sql = 'SELECT id, name, account_id, head, data_inventory, data_point FROM player WHERE 1=1';
     const params = [];
 
     if (search) {
@@ -1356,7 +1356,7 @@ app.get('/api/admin/players', requireAdmin, async (req, res) => {
 
     sql += ' ORDER BY id ASC';
 
-    const countSql = sql.replace('SELECT id, name, account_id, head', 'SELECT COUNT(*) as total');
+    const countSql = sql.replace('SELECT id, name, account_id, head, data_inventory, data_point', 'SELECT COUNT(*) as total');
     const [countRows] = await pool.query(countSql, params);
     const total = countRows[0].total;
 

@@ -355,6 +355,8 @@ export interface Player {
   name: string;
   account_id: number;
   head: number;
+  data_inventory: string;
+  data_point: string;
 }
 
 export interface InventoryItem {

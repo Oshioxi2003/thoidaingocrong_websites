@@ -507,7 +507,7 @@ function UsersTab() {
           <input
             value={search}
             onChange={e => handleSearch(e.target.value)}
-            placeholder="Tìm theo tên hoặc email..."
+            placeholder="Tìm theo tên, email hoặc IP..."
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
           {search && (
@@ -555,6 +555,7 @@ function UsersTab() {
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Email</th>
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Vai trò</th>
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Cash</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">IP Address</th>
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Trạng thái</th>
                   <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Hành động</th>
                 </tr>
@@ -573,6 +574,7 @@ function UsersTab() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{user.cash.toLocaleString()}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{user.ip_address || '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
                         user.ban ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'
@@ -1288,6 +1290,34 @@ function ItemOptionPicker({ allOptions, onSelect, optionColors }: {
 }
 
 /* ============ INVENTORY ============ */
+
+// Parse data_inventory: [vàng, ngọc_xanh, hồng_ngọc, ...]
+function parsePlayerInventoryData(dataInventory: string | null | undefined) {
+  try {
+    const arr = JSON.parse(dataInventory || '[]');
+    return {
+      vang: Number(arr[0]) || 0,
+      ngocXanh: Number(arr[1]) || 0,
+      hongNgoc: Number(arr[2]) || 0,
+    };
+  } catch { return { vang: 0, ngocXanh: 0, hongNgoc: 0 }; }
+}
+
+// Parse data_point: [..., sức_mạnh (index 1), ...]
+function parsePlayerPower(dataPoint: string | null | undefined) {
+  try {
+    const arr = JSON.parse(dataPoint || '[]');
+    return Number(arr[1]) || 0;
+  } catch { return 0; }
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
 function InventoryTab() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -1387,6 +1417,18 @@ function InventoryTab() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground truncate">{player.name}</p>
                       <p className="text-xs text-muted-foreground">ID: {player.id} • Account: {player.account_id}</p>
+                      {(() => {
+                        const inv = parsePlayerInventoryData(player.data_inventory);
+                        const power = parsePlayerPower(player.data_point);
+                        return (
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="text-[10px] text-yellow-500" title="Vàng">🪙 {formatNumber(inv.vang)}</span>
+                            <span className="text-[10px] text-blue-400" title="Ngọc xanh">💎 {formatNumber(inv.ngocXanh)}</span>
+                            <span className="text-[10px] text-pink-400" title="Hồng ngọc">🔮 {formatNumber(inv.hongNgoc)}</span>
+                            {power > 0 && <span className="text-[10px] text-orange-400" title="Sức mạnh">⚡ {formatNumber(power)}</span>}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </button>
                 ))}
@@ -1424,6 +1466,44 @@ function InventoryTab() {
           ) : loadingInventory ? (
             <div className="py-20 text-center text-muted-foreground">Đang tải hành trang...</div>
           ) : (
+            <>
+            {/* Player Stats Banner */}
+            {(() => {
+              const inv = parsePlayerInventoryData(selectedPlayer.data_inventory);
+              const power = parsePlayerPower(selectedPlayer.data_point);
+              return (
+                <div className="mx-4 mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="flex items-center gap-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
+                    <span className="text-base">🪙</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground">Vàng</p>
+                      <p className="text-xs font-bold text-yellow-500 truncate">{inv.vang.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2">
+                    <span className="text-base">💎</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground">Ngọc xanh</p>
+                      <p className="text-xs font-bold text-blue-400 truncate">{inv.ngocXanh.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-pink-500/20 bg-pink-500/5 px-3 py-2">
+                    <span className="text-base">🔮</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground">Hồng ngọc</p>
+                      <p className="text-xs font-bold text-pink-400 truncate">{inv.hongNgoc.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/5 px-3 py-2">
+                    <span className="text-base">⚡</span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground">Sức mạnh</p>
+                      <p className="text-xs font-bold text-orange-400 truncate">{power.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="p-4">
               <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
                 {gridItems.map((item, i) => (
@@ -1516,6 +1596,7 @@ function InventoryTab() {
                 </div>
               )}
             </div>
+            </>
           )}
         </div>
       </div>

@@ -295,6 +295,8 @@ export default function DepositPage() {
                       rewards={[
                         '10 ngọc rồng 3 sao + 100k ngọc xanh',
                         '30 Đá bảo vệ',
+                        'Cân đẩu vân ngũ sắc',
+                        '1 hộp quà thần linh (ramdom 1-5 món)',
                       ]}
                     />
                   </div>
@@ -617,7 +619,7 @@ export default function DepositPage() {
                   <MilestoneCard amount="50K" color="from-slate-500 to-slate-600" icon={<Star size={16} />} rewards={['Nhận đệ tự thường']} />
                   <MilestoneCard amount="100K" color="from-green-500 to-emerald-600" icon={<Shield size={16} />} rewards={['10 Đá bảo vệ (1143)', '100 Đá thạch anh tím (224)']} />
                   <MilestoneCard amount="200K" color="from-blue-500 to-indigo-600" icon={<Zap size={16} />} rewards={['Cải trang: 20% HP KI SD', '5% Húp máu']} />
-                  <MilestoneCard amount="500K" color="from-purple-500 to-violet-600" icon={<Crown size={16} />} rewards={['10 viên 3 sao + 100k ngọc xanh', '30 Đá bảo vệ']} />
+                  <MilestoneCard amount="500K" color="from-purple-500 to-violet-600" icon={<Crown size={16} />} rewards={['10 ngọc rồng 3 sao + 100k ngọc xanh', '30 Đá bảo vệ', 'Cân đẩu vân ngũ sắc', '1 hộp quà thần linh (ramdom 1-5 món)']} />
                   <MilestoneCard amount="1.000K" color="from-amber-500 to-orange-600" icon={<Swords size={16} />} rewards={['Cải trang: 25% HP KI SD', '10% Húp máu', '10% Sức đánh chí mạng', '+ Set TL + 50 Đá bảo vệ']} />
                   <MilestoneCard amount="2.000K" color="from-rose-500 to-pink-600" icon={<Gem size={16} />} rewards={['Cải trang: 30% HP KI SD', '10% Húp máu', '15% Sức đánh chí mạng', '+ Set TL + 100 Đá bảo vệ']} />
                   <MilestoneCard amount="5.000K" color="from-yellow-400 to-amber-500" icon={<Crown size={16} />} rewards={['Cải trang: 35% HP KI SD', '15% Húp máu', '15% Sức đánh chí mạng', 'Kháng lạnh', '+ Set TL + 999 Mảnh Thiên Sứ', '+ 500 Đá bảo vệ']} legendary />
