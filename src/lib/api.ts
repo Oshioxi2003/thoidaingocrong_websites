@@ -426,6 +426,18 @@ export async function fetchItemTemplates(params?: {
   return request<PaginatedResponse<ItemTemplate>>(`/admin/item-templates?${q.toString()}`);
 }
 
+export async function updatePlayerStats(playerId: number, data: {
+  vang?: number;
+  ngocXanh?: number;
+  hongNgoc?: number;
+  sucManh?: number;
+}): Promise<{ message: string; player: Player }> {
+  return request<{ message: string; player: Player }>(`/admin/players/${playerId}/stats`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 // ============ Admin — History Transaction API ============
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1520,6 +1520,56 @@ app.delete('/api/admin/players/:playerId/inventory/:slot', requireAdmin, async (
   }
 });
 
+// PUT /api/admin/players/:id/stats — Chỉnh sửa vàng, ngọc xanh, hồng ngọc, sức mạnh
+app.put('/api/admin/players/:id/stats', requireAdmin, async (req, res) => {
+  try {
+    const playerId = req.params.id;
+    const { vang, ngocXanh, hongNgoc, sucManh } = req.body;
+
+    // Lấy data hiện tại
+    const [rows] = await pool.query('SELECT data_inventory, data_point FROM player WHERE id = ?', [playerId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhân vật' });
+    }
+
+    // Parse data_inventory: [vàng, ngọc_xanh, hồng_ngọc, ...]
+    let dataInventory = [];
+    try { dataInventory = JSON.parse(rows[0].data_inventory || '[]'); } catch { dataInventory = []; }
+    // Đảm bảo mảng có đủ 3 phần tử
+    while (dataInventory.length < 3) dataInventory.push(0);
+
+    if (vang !== undefined && vang !== null) dataInventory[0] = Number(vang);
+    if (ngocXanh !== undefined && ngocXanh !== null) dataInventory[1] = Number(ngocXanh);
+    if (hongNgoc !== undefined && hongNgoc !== null) dataInventory[2] = Number(hongNgoc);
+
+    // Parse data_point: [..., sức_mạnh (index 1), ...]
+    let dataPoint = [];
+    try { dataPoint = JSON.parse(rows[0].data_point || '[]'); } catch { dataPoint = []; }
+    // Đảm bảo mảng có đủ 2 phần tử
+    while (dataPoint.length < 2) dataPoint.push(0);
+
+    if (sucManh !== undefined && sucManh !== null) dataPoint[1] = Number(sucManh);
+
+    // Cập nhật DB
+    await pool.query(
+      'UPDATE player SET data_inventory = ?, data_point = ? WHERE id = ?',
+      [JSON.stringify(dataInventory), JSON.stringify(dataPoint), playerId]
+    );
+
+    // Trả về data mới
+    const [updated] = await pool.query(
+      'SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name FROM player p LEFT JOIN account a ON p.account_id = a.id WHERE p.id = ?',
+      [playerId]
+    );
+
+    console.log(`✏️ [Admin] Cập nhật stats nhân vật #${playerId}: vàng=${dataInventory[0]}, ngọc=${dataInventory[1]}, hồng ngọc=${dataInventory[2]}, sức mạnh=${dataPoint[1]}`);
+    res.json({ message: 'Cập nhật thành công', player: updated[0] });
+  } catch (err) {
+    console.error('PUT /api/admin/players/:id/stats error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // GET /api/admin/item-templates — Lấy danh sách item từ item_template (cho item picker)
 app.get('/api/admin/item-templates', requireAdmin, async (req, res) => {
   try {
@@ -1603,9 +1653,9 @@ app.get('/api/admin/transactions', requireAdmin, async (req, res) => {
     const params = [];
 
     if (search) {
-      // Tìm theo tên người chơi hoặc nội dung giao dịch
-      sql += ' AND (player1 LIKE ? OR player2 LIKE ? OR note LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      // Tìm theo tên người chơi (player1, player2)
+      sql += ' AND (player1 LIKE ? OR player2 LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
     }
 
     sql += ' ORDER BY id DESC';

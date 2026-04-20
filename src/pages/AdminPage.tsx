@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Users, Gift, ClipboardCheck, Package, Wallet,
   ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock,
-  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert, SlidersHorizontal, ArrowDownUp, History
+  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert, SlidersHorizontal, ArrowDownUp, History, Save
 } from 'lucide-react';
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
@@ -14,6 +14,7 @@ import {
   fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
   fetchAdminDeposits, fetchDepositStats, approveDeposit, getCurrentUser,
   fetchTransactions, fetchTransactionColumns,
+  updatePlayerStats,
   type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate,
   type ItemOption, type GiftcodeDetailItem, type DepositOrder, type DepositStats,
   type HistoryTransaction
@@ -55,9 +56,8 @@ function Pagination({ page, totalPages, total, perPage, onPageChange, label = 'm
             <span key={`dots-${i}`} className="px-2 text-xs text-muted-foreground">…</span>
           ) : (
             <button key={p} onClick={() => onPageChange(p)}
-              className={`min-w-[32px] rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                page === p ? 'gradient-fire text-primary-foreground shadow-glow' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}>{p}</button>
+              className={`min-w-[32px] rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${page === p ? 'gradient-fire text-primary-foreground shadow-glow' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}>{p}</button>
           )
         )}
         <button onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page >= totalPages}
@@ -75,9 +75,8 @@ function PerPageSelector({ perPage, onChange }: { perPage: number; onChange: (n:
       <span className="text-xs text-muted-foreground">Hiển thị:</span>
       {[20, 50, 100].map(n => (
         <button key={n} onClick={() => onChange(n)}
-          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-            perPage === n ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-          }`}>{n}</button>
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${perPage === n ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+            }`}>{n}</button>
       ))}
     </div>
   );
@@ -167,11 +166,10 @@ export default function AdminPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
-                activeTab === tab.key
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${activeTab === tab.key
                   ? 'bg-primary/10 font-semibold text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
+                }`}
             >
               <tab.icon size={18} />
               {sidebarOpen && <span>{tab.label}</span>}
@@ -525,9 +523,8 @@ function UsersTab() {
             <button
               key={f.key}
               onClick={() => handleRole(f.key)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                roleFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-              }`}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${roleFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                }`}
             >{f.label}</button>
           ))}
         </div>
@@ -536,9 +533,8 @@ function UsersTab() {
             <button
               key={f.key}
               onClick={() => handleStatus(f.key)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-              }`}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                }`}
             >{f.label}</button>
           ))}
         </div>
@@ -571,29 +567,26 @@ function UsersTab() {
                     <td className="px-4 py-3 font-medium text-foreground">{user.username}</td>
                     <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                        user.is_admin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                      }`}>
+                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${user.is_admin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
                         {user.is_admin ? 'Admin' : 'User'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{user.cash.toLocaleString()}</td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{user.ip_address || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                        user.ban ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'
-                      }`}>
+                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${user.ban ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'
+                        }`}>
                         {user.ban ? 'Bị cấm' : 'Hoạt động'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => banMutation.mutate({ id: user.id, ban: !user.ban })}
-                        className={`rounded-lg p-1.5 transition-colors ${
-                          user.ban
+                        className={`rounded-lg p-1.5 transition-colors ${user.ban
                             ? 'text-emerald-500 hover:bg-emerald-500/10'
                             : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
-                        }`}
+                          }`}
                         title={user.ban ? 'Mở cấm' : 'Cấm user'}
                       >
                         {user.ban ? <CheckCircle size={16} /> : <Ban size={16} />}
@@ -677,9 +670,8 @@ function GiftcodesTab() {
             <button
               key={f.key}
               onClick={() => handleStatus(f.key)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-              }`}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                }`}
             >{f.label}</button>
           ))}
         </div>
@@ -767,9 +759,8 @@ function GiftcodeCard({ gc, isExpired: expired, index, onDelete, onView }: {
               • Hạn: {new Date(gc.expired).toLocaleDateString('vi-VN')}
             </p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            expired ? 'bg-muted text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500'
-          }`}>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${expired ? 'bg-muted text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500'
+            }`}>
             {expired ? 'Hết hạn' : 'Hoạt động'}
           </span>
         </div>
@@ -1329,6 +1320,7 @@ function InventoryTab() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [sortBy, setSortBy] = useState<string>('');
+  const [editingStats, setEditingStats] = useState<{ vang: number; ngocXanh: number; hongNgoc: number; sucManh: number } | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch players
@@ -1347,6 +1339,16 @@ function InventoryTab() {
   const deleteMutation = useMutation({
     mutationFn: ({ playerId, slot }: { playerId: number; slot: number }) => deleteInventoryItem(playerId, slot),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-inventory', selectedPlayer?.id] }),
+  });
+
+  const statsMutation = useMutation({
+    mutationFn: ({ playerId, data }: { playerId: number; data: { vang?: number; ngocXanh?: number; hongNgoc?: number; sucManh?: number } }) =>
+      updatePlayerStats(playerId, data),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-players'] });
+      if (result.player) setSelectedPlayer(result.player);
+      setEditingStats(null);
+    },
   });
 
   const players = playersData?.data || [];
@@ -1404,11 +1406,10 @@ function InventoryTab() {
           <button
             key={f.key}
             onClick={() => handleSort(f.key)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              sortBy === f.key
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${sortBy === f.key
                 ? 'gradient-fire text-primary-foreground shadow-glow'
                 : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-            }`}
+              }`}
           >
             {f.icon} {f.label}
           </button>
@@ -1441,9 +1442,8 @@ function InventoryTab() {
                   <button
                     key={player.id}
                     onClick={() => setSelectedPlayer(player)}
-                    className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30 ${
-                      selectedPlayer?.id === player.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''
-                    }`}
+                    className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30 ${selectedPlayer?.id === player.id ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                      }`}
                   >
                     <img
                       src={`/media/icon/${player.head || 0}.png`}
@@ -1504,135 +1504,176 @@ function InventoryTab() {
             <div className="py-20 text-center text-muted-foreground">Đang tải hành trang...</div>
           ) : (
             <>
-            {/* Player Stats Banner */}
-            {(() => {
-              const inv = parsePlayerInventoryData(selectedPlayer.data_inventory);
-              const power = parsePlayerPower(selectedPlayer.data_point);
-              return (
-                <div className="mx-4 mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="flex items-center gap-2 rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
-                    <span className="text-base">🪙</span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground">Vàng</p>
-                      <p className="text-xs font-bold text-yellow-500 truncate">{inv.vang.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2">
-                    <span className="text-base">💎</span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground">Ngọc xanh</p>
-                      <p className="text-xs font-bold text-blue-400 truncate">{inv.ngocXanh.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-pink-500/20 bg-pink-500/5 px-3 py-2">
-                    <span className="text-base">🔮</span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground">Hồng ngọc</p>
-                      <p className="text-xs font-bold text-pink-400 truncate">{inv.hongNgoc.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/5 px-3 py-2">
-                    <span className="text-base">⚡</span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground">Sức mạnh</p>
-                      <p className="text-xs font-bold text-orange-400 truncate">{power.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-            <div className="p-4">
-              <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
-                {gridItems.map((item, i) => (
-                  <div
-                    key={i}
-                    className={`group relative flex aspect-square items-center justify-center rounded-lg border transition-all ${
-                      item
-                        ? 'border-border/80 bg-gradient-to-br from-muted/80 to-muted/30 hover:border-primary/50 hover:shadow-md cursor-pointer'
-                        : 'border-dashed border-border/40 bg-muted/10'
-                    }`}
-                    title={item ? `${item.name} (ID: ${item.item_id}) | SL: ${item.quantity} | Slot: ${item.slot}` : `Slot ${i}`}
-                  >
-                    {item && (
-                      <>
-                        <img
-                          src={`/media/icon/${item.icon_id}.png`}
-                          alt={item.name}
-                          className="h-8 w-8 object-contain drop-shadow-sm"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                        {item.quantity > 1 && (
-                          <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white leading-tight">
-                            {item.quantity > 999999 ? `${(item.quantity / 1000000).toFixed(1)}M` : item.quantity > 999 ? `${(item.quantity / 1000).toFixed(0)}K` : item.quantity}
-                          </span>
-                        )}
-                        {/* Delete overlay on hover */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`Xóa vật phẩm "${item.name}" (ID: ${item.item_id}, slot ${item.slot})?`))
-                              deleteMutation.mutate({ playerId: selectedPlayer!.id, slot: item.slot });
-                          }}
-                          className="absolute -right-1 -top-1 hidden rounded-full bg-destructive p-0.5 text-white shadow-md transition-transform hover:scale-110 group-hover:block"
-                          title="Xóa vật phẩm"
-                        >
-                          <X size={10} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
+              {/* Player Stats Banner — Editable */}
+              {(() => {
+                const inv = parsePlayerInventoryData(selectedPlayer.data_inventory);
+                const power = parsePlayerPower(selectedPlayer.data_point);
+                const isEditing = editingStats !== null;
 
-              {/* Item detail table */}
-              {inventory.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/50">
-                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Slot</th>
-                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Icon</th>
-                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Tên vật phẩm</th>
-                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Item ID</th>
-                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Số lượng</th>
-                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Options</th>
-                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Xóa</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {inventory.map((item: InventoryItem) => (
-                        <tr key={item.slot} className="border-b border-border/50 transition-colors hover:bg-muted/30">
-                          <td className="px-3 py-2 text-muted-foreground">{item.slot}</td>
-                          <td className="px-3 py-2">
-                            <img
-                              src={`/media/icon/${item.icon_id}.png`}
-                              alt=""
-                              className="h-6 w-6 object-contain"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-foreground max-w-[150px] truncate" title={item.name}>{item.name}</td>
-                          <td className="px-3 py-2 font-mono text-foreground">{item.item_id}</td>
-                          <td className="px-3 py-2 text-foreground">{item.quantity.toLocaleString()}</td>
-                          <td className="px-3 py-2 max-w-[200px] truncate font-mono text-muted-foreground" title={item.options}>{item.options}</td>
-                          <td className="px-3 py-2 text-right">
+                const startEditing = () => {
+                  setEditingStats({ vang: inv.vang, ngocXanh: inv.ngocXanh, hongNgoc: inv.hongNgoc, sucManh: power });
+                };
+                const cancelEditing = () => setEditingStats(null);
+                const saveStats = () => {
+                  if (!editingStats || !selectedPlayer) return;
+                  statsMutation.mutate({ playerId: selectedPlayer.id, data: editingStats });
+                };
+
+                const statCards = [
+                  { key: 'vang' as const, label: 'Vàng', icon: '🪙', value: inv.vang, color: 'yellow', textColor: 'text-yellow-500', borderColor: 'border-yellow-500/20', bgColor: 'bg-yellow-500/5' },
+                  { key: 'ngocXanh' as const, label: 'Ngọc xanh', icon: '💎', value: inv.ngocXanh, color: 'blue', textColor: 'text-blue-400', borderColor: 'border-blue-500/20', bgColor: 'bg-blue-500/5' },
+                  { key: 'hongNgoc' as const, label: 'Hồng ngọc', icon: '🔮', value: inv.hongNgoc, color: 'pink', textColor: 'text-pink-400', borderColor: 'border-pink-500/20', bgColor: 'bg-pink-500/5' },
+                  { key: 'sucManh' as const, label: 'Sức mạnh', icon: '⚡', value: power, color: 'orange', textColor: 'text-orange-400', borderColor: 'border-orange-500/20', bgColor: 'bg-orange-500/5' },
+                ];
+
+                return (
+                  <div className="mx-4 mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-muted-foreground">Chỉ số nhân vật</span>
+                      <div className="flex items-center gap-1.5">
+                        {isEditing ? (
+                          <>
                             <button
-                              onClick={() => {
-                                if (confirm(`Xóa "${item.name}" (ID: ${item.item_id})?`))
-                                  deleteMutation.mutate({ playerId: selectedPlayer!.id, slot: item.slot });
-                              }}
-                              className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              onClick={cancelEditing}
+                              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted transition-colors"
                             >
-                              <Trash2 size={14} />
+                              <X size={12} /> Hủy
                             </button>
-                          </td>
-                        </tr>
+                            <button
+                              onClick={saveStats}
+                              disabled={statsMutation.isPending}
+                              className="gradient-fire inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[10px] font-semibold text-primary-foreground shadow-glow hover:scale-105 transition-transform disabled:opacity-50"
+                            >
+                              <Save size={12} /> {statsMutation.isPending ? 'Đang lưu...' : 'Lưu'}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={startEditing}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                          >
+                            <Edit size={12} /> Chỉnh sửa
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {statsMutation.isError && (
+                      <p className="mb-2 text-[10px] text-destructive">Lỗi: {(statsMutation.error as Error).message}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {statCards.map(card => (
+                        <div key={card.key} className={`flex items-center gap-2 rounded-xl border ${card.borderColor} ${card.bgColor} px-3 py-2`}>
+                          <span className="text-base">{card.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] text-muted-foreground">{card.label}</p>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editingStats[card.key]}
+                                onChange={e => setEditingStats(prev => prev ? { ...prev, [card.key]: Number(e.target.value) || 0 } : prev)}
+                                className={`w-full rounded border border-border bg-background px-1.5 py-0.5 text-xs font-bold ${card.textColor} focus:border-primary focus:outline-none`}
+                              />
+                            ) : (
+                              <p className={`text-xs font-bold ${card.textColor} truncate`}>{card.value.toLocaleString()}</p>
+                            )}
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
+                );
+              })()}
+              <div className="p-4">
+                <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
+                  {gridItems.map((item, i) => (
+                    <div
+                      key={i}
+                      className={`group relative flex aspect-square items-center justify-center rounded-lg border transition-all ${item
+                          ? 'border-border/80 bg-gradient-to-br from-muted/80 to-muted/30 hover:border-primary/50 hover:shadow-md cursor-pointer'
+                          : 'border-dashed border-border/40 bg-muted/10'
+                        }`}
+                      title={item ? `${item.name} (ID: ${item.item_id}) | SL: ${item.quantity} | Slot: ${item.slot}` : `Slot ${i}`}
+                    >
+                      {item && (
+                        <>
+                          <img
+                            src={`/media/icon/${item.icon_id}.png`}
+                            alt={item.name}
+                            className="h-8 w-8 object-contain drop-shadow-sm"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                          {item.quantity > 1 && (
+                            <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white leading-tight">
+                              {item.quantity > 999999 ? `${(item.quantity / 1000000).toFixed(1)}M` : item.quantity > 999 ? `${(item.quantity / 1000).toFixed(0)}K` : item.quantity}
+                            </span>
+                          )}
+                          {/* Delete overlay on hover */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Xóa vật phẩm "${item.name}" (ID: ${item.item_id}, slot ${item.slot})?`))
+                                deleteMutation.mutate({ playerId: selectedPlayer!.id, slot: item.slot });
+                            }}
+                            className="absolute -right-1 -top-1 hidden rounded-full bg-destructive p-0.5 text-white shadow-md transition-transform hover:scale-110 group-hover:block"
+                            title="Xóa vật phẩm"
+                          >
+                            <X size={10} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+
+                {/* Item detail table */}
+                {inventory.length > 0 && (
+                  <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/50">
+                          <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Slot</th>
+                          <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Icon</th>
+                          <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Tên vật phẩm</th>
+                          <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Item ID</th>
+                          <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Số lượng</th>
+                          <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Options</th>
+                          <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Xóa</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inventory.map((item: InventoryItem) => (
+                          <tr key={item.slot} className="border-b border-border/50 transition-colors hover:bg-muted/30">
+                            <td className="px-3 py-2 text-muted-foreground">{item.slot}</td>
+                            <td className="px-3 py-2">
+                              <img
+                                src={`/media/icon/${item.icon_id}.png`}
+                                alt=""
+                                className="h-6 w-6 object-contain"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-foreground max-w-[150px] truncate" title={item.name}>{item.name}</td>
+                            <td className="px-3 py-2 font-mono text-foreground">{item.item_id}</td>
+                            <td className="px-3 py-2 text-foreground">{item.quantity.toLocaleString()}</td>
+                            <td className="px-3 py-2 max-w-[200px] truncate font-mono text-muted-foreground" title={item.options}>{item.options}</td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Xóa "${item.name}" (ID: ${item.item_id})?`))
+                                    deleteMutation.mutate({ playerId: selectedPlayer!.id, slot: item.slot });
+                                }}
+                                className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -1774,9 +1815,8 @@ function AddItemModal({ playerId, playerName, onClose, onSuccess }: {
                       <button
                         key={t.id}
                         onClick={() => { setItemId(String(t.id)); setShowIconPicker(false); }}
-                        className={`flex flex-col items-center justify-center rounded-md border p-1 text-[8px] transition-all hover:border-primary hover:bg-primary/10 ${
-                          String(t.id) === itemId ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border/30 bg-background/50'
-                        }`}
+                        className={`flex flex-col items-center justify-center rounded-md border p-1 text-[8px] transition-all hover:border-primary hover:bg-primary/10 ${String(t.id) === itemId ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border/30 bg-background/50'
+                          }`}
                         title={`${t.name} (ID: ${t.id}, Icon: ${t.icon_id})`}
                       >
                         <img
@@ -1976,9 +2016,8 @@ function DepositsTab() {
             <button
               key={f.key}
               onClick={() => handleStatus(f.key)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-              }`}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${statusFilter === f.key ? 'gradient-fire text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                }`}
             >{f.label}</button>
           ))}
         </div>
@@ -2023,11 +2062,10 @@ function DepositsTab() {
                       <span className="font-display font-semibold text-foreground">{formatVND(d.amount)}đ</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                        d.status === 1
+                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${d.status === 1
                           ? 'bg-emerald-500/10 text-emerald-500'
                           : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
-                      }`}>
+                        }`}>
                         {d.status === 1 ? 'Thành công' : 'Đang chờ'}
                       </span>
                     </td>
