@@ -1342,21 +1342,21 @@ async function parseNROItems(itemsBagJson) {
   return result;
 }
 
-// GET /api/admin/players — Tìm kiếm nhân vật theo tên
+// GET /api/admin/players — Tìm kiếm nhân vật theo tên hoặc tên account
 app.get('/api/admin/players', requireAdmin, async (req, res) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
-    let sql = 'SELECT id, name, account_id, head, data_inventory, data_point FROM player WHERE 1=1';
+    let sql = 'SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name FROM player p LEFT JOIN account a ON p.account_id = a.id WHERE 1=1';
     const params = [];
 
     if (search) {
-      sql += ' AND name LIKE ?';
-      params.push(`%${search}%`);
+      sql += ' AND (p.name LIKE ? OR a.username LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
     }
 
-    sql += ' ORDER BY id ASC';
+    sql += ' ORDER BY p.id ASC';
 
-    const countSql = sql.replace('SELECT id, name, account_id, head, data_inventory, data_point', 'SELECT COUNT(*) as total');
+    const countSql = sql.replace('SELECT p.id, p.name, p.account_id, p.head, p.data_inventory, p.data_point, a.username as account_name', 'SELECT COUNT(*) as total');
     const [countRows] = await pool.query(countSql, params);
     const total = countRows[0].total;
 

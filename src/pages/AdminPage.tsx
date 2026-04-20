@@ -1375,7 +1375,7 @@ function InventoryTab() {
           <input
             value={search}
             onChange={e => handleSearch(e.target.value)}
-            placeholder="Tìm nhân vật theo tên..."
+            placeholder="Tìm nhân vật theo tên hoặc tên account..."
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
           {search && (
@@ -1416,7 +1416,7 @@ function InventoryTab() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground truncate">{player.name}</p>
-                      <p className="text-xs text-muted-foreground">ID: {player.id} • Account: {player.account_id}</p>
+                      <p className="text-xs text-muted-foreground">ID: {player.id} • Account: {player.account_name || player.account_id}</p>
                       {(() => {
                         const inv = parsePlayerInventoryData(player.data_inventory);
                         const power = parsePlayerPower(player.data_point);
