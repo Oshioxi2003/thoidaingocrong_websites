@@ -57,14 +57,10 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
     })
       .then(res => {
         if (res.status === 401) {
-          // Phiên hết hạn — tự động logout
-          res.json().then(d => {
-            if (d.code === 'INVALID_SESSION') {
-              localStorage.removeItem('user');
-              localStorage.removeItem('session_token');
-              window.dispatchEvent(new CustomEvent('auth:session-expired'));
-            }
-          });
+          // Bất kỳ 401 nào → phiên cũ không hợp lệ → buộc đăng nhập lại
+          localStorage.removeItem('user');
+          localStorage.removeItem('session_token');
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
           return null;
         }
         return res.json();
