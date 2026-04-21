@@ -51,9 +51,26 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
   useEffect(() => {
     if (!dropdownOpen || !user) return;
     const currentUserId = user.id;
-    fetch(`/api/auth/me?user_id=${user.id}`)
-      .then(res => res.json())
+    const token = localStorage.getItem('session_token');
+    fetch(`/api/auth/me?user_id=${user.id}`, {
+      headers: token ? { 'x-session-token': token } : {},
+    })
+      .then(res => {
+        if (res.status === 401) {
+          // Phiên hết hạn — tự động logout
+          res.json().then(d => {
+            if (d.code === 'INVALID_SESSION') {
+              localStorage.removeItem('user');
+              localStorage.removeItem('session_token');
+              window.dispatchEvent(new CustomEvent('auth:session-expired'));
+            }
+          });
+          return null;
+        }
+        return res.json();
+      })
       .then(data => {
+        if (!data) return;
         if (data.user && data.user.id === currentUserId) {
           const updated = { ...user, ...data.user };
           setUser(updated);

@@ -25,20 +25,28 @@ app.use(cors());
 app.use(express.json());
 
 // ======================== ADMIN AUTH MIDDLEWARE ========================
-// Middleware kiểm tra quyền admin từ header x-user-id
-// Xác thực trực tiếp từ database để tránh giả mạo localStorage
+// Middleware kiểm tra quyền admin từ header x-user-id + x-session-token
+// Xác thực trực tiếp từ database — không tin localStorage
 async function requireAdmin(req, res, next) {
   try {
     const userId = req.headers['x-user-id'];
-    if (!userId) {
+    const sessionToken = req.headers['x-session-token'];
+    if (!userId || !sessionToken) {
       return res.status(401).json({ error: 'Vui lòng đăng nhập' });
     }
     const [rows] = await pool.query(
-      'SELECT id, is_admin FROM account WHERE id = ?',
+      'SELECT id, is_admin, session_token, ban FROM account WHERE id = ?',
       [Number(userId)]
     );
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Tài khoản không tồn tại' });
+    }
+    if (rows[0].ban === 1) {
+      return res.status(403).json({ error: 'Tài khoản đã bị khóa' });
+    }
+    // Kiểm tra session token — chỉ reject khi DB có token VÀ không khớp
+    if (rows[0].session_token !== null && rows[0].session_token !== sessionToken) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
     }
     if (rows[0].is_admin !== 1) {
       return res.status(403).json({ error: 'Bạn không có quyền truy cập chức năng này' });
@@ -418,9 +426,30 @@ app.post('/api/posts', async (req, res) => {
 });
 
 // PUT /api/posts/:id — Sửa bài viết (chỉ tác giả hoặc admin)
+// [FIX] is_admin và user_id được xác thực từ DB qua session token, không tin body
 app.put('/api/posts/:id', async (req, res) => {
   try {
-    const { title, description, category, author_id, is_admin, event_start, event_end, badge } = req.body;
+    const { title, description, category, event_start, event_end, badge } = req.body;
+    const requestUserId = Number(req.headers['x-user-id']);
+    const sessionToken = req.headers['x-session-token'];
+
+    // Xác thực người dùng nếu có gửi token
+    let callerIsAdmin = false;
+    let callerUserId = null;
+    if (requestUserId && sessionToken) {
+      const [callerRows] = await pool.query(
+        'SELECT id, is_admin, session_token FROM account WHERE id = ?',
+        [requestUserId]
+      );
+      if (callerRows.length > 0) {
+        const caller = callerRows[0];
+        // Token hợp lệ (hoặc DB token NULL = user cũ)
+        if (caller.session_token === null || caller.session_token === sessionToken) {
+          callerIsAdmin = caller.is_admin === 1;
+          callerUserId = caller.id;
+        }
+      }
+    }
 
     // Kiểm tra bài viết tồn tại
     const [existing] = await pool.query('SELECT * FROM posts WHERE id = ?', [req.params.id]);
@@ -428,9 +457,9 @@ app.put('/api/posts/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy bài viết' });
     }
 
-    // Chỉ tác giả hoặc admin mới được sửa
+    // Chỉ tác giả hoặc admin (xác thực từ DB) mới được sửa
     const post = existing[0];
-    if (!is_admin && post.author_id !== author_id) {
+    if (!callerIsAdmin && post.author_id !== callerUserId) {
       return res.status(403).json({ error: 'Bạn không có quyền sửa bài viết này' });
     }
 
@@ -508,15 +537,40 @@ app.get('/api/posts/:id/comments', async (req, res) => {
 });
 
 // POST /api/posts/:id/comments — Thêm bình luận
+// [FIX] username lấy từ DB theo user_id + session_token, không tin body
 app.post('/api/posts/:id/comments', async (req, res) => {
   try {
-    const { user_id, username, content } = req.body;
-    if (!user_id || !username || !content?.trim()) {
-      return res.status(400).json({ error: 'Thiếu thông tin bình luận' });
+    const { content } = req.body;
+    const requestUserId = Number(req.headers['x-user-id']);
+    const sessionToken = req.headers['x-session-token'];
+
+    if (!requestUserId || !sessionToken) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập để bình luận' });
     }
+    if (!content?.trim()) {
+      return res.status(400).json({ error: 'Nội dung bình luận không được để trống' });
+    }
+
+    // Xác thực user từ DB — lấy username thực, không tin body
+    const [callerRows] = await pool.query(
+      'SELECT id, username, session_token, ban FROM account WHERE id = ?',
+      [requestUserId]
+    );
+    if (callerRows.length === 0) {
+      return res.status(401).json({ error: 'Tài khoản không tồn tại' });
+    }
+    const caller = callerRows[0];
+    if (caller.ban === 1) {
+      return res.status(403).json({ error: 'Tài khoản đã bị khóa' });
+    }
+    // Kiểm tra token (nếu DB có token)
+    if (caller.session_token !== null && caller.session_token !== sessionToken) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
     const [result] = await pool.query(
       'INSERT INTO post_comments (post_id, user_id, username, content) VALUES (?, ?, ?, ?)',
-      [req.params.id, user_id, username, content.trim()]
+      [req.params.id, caller.id, caller.username, content.trim()]
     );
     const [newComment] = await pool.query('SELECT * FROM post_comments WHERE id = ?', [result.insertId]);
     res.status(201).json(newComment[0]);
@@ -527,16 +581,41 @@ app.post('/api/posts/:id/comments', async (req, res) => {
 });
 
 // DELETE /api/comments/:id — Xóa bình luận (tác giả hoặc admin)
+// [FIX] is_admin và user_id xác thực từ DB qua session token, không tin body
 app.delete('/api/comments/:id', async (req, res) => {
   try {
-    const { user_id, is_admin } = req.body;
+    const requestUserId = Number(req.headers['x-user-id']);
+    const sessionToken = req.headers['x-session-token'];
+
+    if (!requestUserId || !sessionToken) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập' });
+    }
+
+    // Xác thực người gửi request từ DB
+    const [callerRows] = await pool.query(
+      'SELECT id, is_admin, session_token FROM account WHERE id = ?',
+      [requestUserId]
+    );
+    if (callerRows.length === 0) {
+      return res.status(401).json({ error: 'Tài khoản không tồn tại' });
+    }
+    const caller = callerRows[0];
+    if (caller.session_token !== null && caller.session_token !== sessionToken) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
+    // Kiểm tra bình luận tồn tại
     const [rows] = await pool.query('SELECT * FROM post_comments WHERE id = ?', [req.params.id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy bình luận' });
     }
-    if (!is_admin && rows[0].user_id !== user_id) {
+
+    // Chỉ tác giả bình luận hoặc admin (xác thực từ DB) mới được xóa
+    const isAdmin = caller.is_admin === 1;
+    if (!isAdmin && rows[0].user_id !== caller.id) {
       return res.status(403).json({ error: 'Bạn không có quyền xóa bình luận này' });
     }
+
     await pool.query('DELETE FROM post_comments WHERE id = ?', [req.params.id]);
     res.json({ message: 'Đã xóa bình luận' });
   } catch (err) {
@@ -881,8 +960,14 @@ app.post('/api/auth/register', async (req, res) => {
       [username, password, email]
     );
 
+    // Tạo session token ngay sau đăng ký — giống login
+    const { randomUUID } = await import('crypto');
+    const sessionToken = randomUUID();
+    await pool.query('UPDATE account SET session_token = ? WHERE id = ?', [sessionToken, result.insertId]);
+
     res.status(201).json({
       message: 'Đăng ký thành công!',
+      session_token: sessionToken,
       user: { id: result.insertId, username, email, is_admin: 0, cash: 0, vang: 0, vip: 0, vnd: 0 },
     });
   } catch (err) {
@@ -1023,14 +1108,20 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 });
 
 // GET /api/auth/me — Lấy thông tin user mới nhất (refresh cash, vàng, vip)
-// Đồng thời validate session_token để phát hiện phiên bị kick
+// [FIX] Yêu cầu session token hợp lệ — không cho xem thông tin người khác
 app.get('/api/auth/me', async (req, res) => {
   try {
     const { user_id } = req.query;
     const sessionToken = req.headers['x-session-token'];
+
     if (!user_id) {
       return res.status(400).json({ error: 'Thiếu user_id' });
     }
+    // Bắt buộc phải có session token — không cho anonymous enumerate
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập' });
+    }
+
     const [rows] = await pool.query(
       'SELECT id, username, email, is_admin, cash, vang, vip, vnd, session_token FROM account WHERE id = ?',
       [Number(user_id)]
@@ -1039,11 +1130,13 @@ app.get('/api/auth/me', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
     }
     const account = rows[0];
+
     // Chỉ kick khi DB có token VÀ token không khớp
     // DB token = NULL (user cũ chưa login lại) → vẫn trả bình thường
-    if (sessionToken && account.session_token !== null && account.session_token !== sessionToken) {
+    if (account.session_token !== null && account.session_token !== sessionToken) {
       return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
     }
+
     const { session_token: _st, ...userWithoutToken } = account;
     res.json({ user: userWithoutToken });
   } catch (err) {
