@@ -24,6 +24,7 @@ const CreatePostPage = lazy(() => import("@/pages/CreatePostPage"));
 const MyPostsPage = lazy(() => import("@/pages/MyPostsPage"));
 const DepositPage = lazy(() => import("@/pages/DepositPage"));
 const TopServerPage = lazy(() => import("@/pages/TopServerPage"));
+const AccountPage = lazy(() => import("@/pages/AccountPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const WelcomePopup = lazy(() => import("./components/WelcomePopup"));
 
@@ -69,6 +70,7 @@ const App = () => {
             <Route path="/create-post" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><CreatePostPage /></Suspense></Layout>} />
             <Route path="/my-posts" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><MyPostsPage /></Suspense></Layout>} />
             <Route path="/deposit" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><DepositPage /></Suspense></Layout>} />
+            <Route path="/account" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><AccountPage /></Suspense></Layout>} />
             {/* Public pages with layout */}
             <Route path="/" element={<Layout isDark={isDark} onToggleTheme={toggle}><HomePage /></Layout>} />
             <Route path="/guides" element={<Layout isDark={isDark} onToggleTheme={toggle}><Suspense fallback={<PageLoader />}><GuidesPage /></Suspense></Layout>} />

@@ -209,10 +209,47 @@ app.post('/api/upload/image-url', async (req, res) => {
       await pool.query("ALTER TABLE account ADD COLUMN danap BIGINT DEFAULT 0");
       console.log('✅ Added danap column to account table');
     }
+    // Thêm cột session_token vào bảng account (dùng cho logout all devices)
+    const [stCols] = await pool.query("SHOW COLUMNS FROM account LIKE 'session_token'");
+    if (stCols.length === 0) {
+      await pool.query("ALTER TABLE account ADD COLUMN session_token VARCHAR(64) DEFAULT NULL");
+      console.log('✅ Added session_token column to account table');
+    }
   } catch (err) {
     console.error('Auto-migrate error:', err.message);
   }
 })();
+
+// ======================== AUTH MIDDLEWARE (SESSION TOKEN) ========================
+// Middleware xác thực session token từ header x-session-token
+// Dùng cho các endpoint nhạy cảm: đổi mật khẩu, logout-all
+async function requireAuth(req, res, next) {
+  try {
+    const userId = req.headers['x-user-id'];
+    const sessionToken = req.headers['x-session-token'];
+    if (!userId || !sessionToken) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Vui lòng đăng nhập lại' });
+    }
+    const [rows] = await pool.query(
+      'SELECT id, session_token, ban FROM account WHERE id = ?',
+      [Number(userId)]
+    );
+    if (rows.length === 0) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Tài khoản không tồn tại' });
+    }
+    if (rows[0].ban === 1) {
+      return res.status(403).json({ code: 'BANNED', error: 'Tài khoản đã bị khóa' });
+    }
+    if (rows[0].session_token !== sessionToken) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+    req.authUser = rows[0];
+    next();
+  } catch (err) {
+    console.error('requireAuth error:', err);
+    res.status(500).json({ error: 'Lỗi xác thực' });
+  }
+}
 
 // ======================== POSTS ========================
 
@@ -893,11 +930,16 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Tài khoản hoặc mật khẩu không đúng' });
     }
 
-    // Cập nhật last_time_login
-    await pool.query('UPDATE account SET last_time_login = NOW() WHERE id = ?', [account.id]);
+    // Tạo session token mới (invalidate tất cả phiên cũ trên các thiết bị khác)
+    const { randomUUID } = await import('crypto');
+    const sessionToken = randomUUID();
+
+    // Cập nhật last_time_login + session_token
+    await pool.query('UPDATE account SET last_time_login = NOW(), session_token = ? WHERE id = ?', [sessionToken, account.id]);
 
     res.json({
       message: 'Đăng nhập thành công!',
+      session_token: sessionToken,
       user: {
         id: account.id,
         username: account.username,
@@ -915,21 +957,81 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/logout-all — Đăng xuất tất cả thiết bị
+// Xóa session_token → tất cả thiết bị sẽ bị kick khi check token
+app.post('/api/auth/logout-all', requireAuth, async (req, res) => {
+  try {
+    await pool.query('UPDATE account SET session_token = NULL WHERE id = ?', [req.authUser.id]);
+    res.json({ message: 'Đã đăng xuất khỏi tất cả thiết bị' });
+  } catch (err) {
+    console.error('POST /api/auth/logout-all error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// POST /api/auth/change-password — Đổi mật khẩu (đăng xuất thiết bị cũ, giữ thiết bị hiện tại)
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    const { old_password, new_password } = req.body;
+    if (!old_password || !new_password) {
+      return res.status(400).json({ error: 'Vui lòng nhập đầy đủ mật khẩu cũ và mới' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+    }
+
+    // Lấy mật khẩu hiện tại từ DB
+    const [rows] = await pool.query('SELECT password FROM account WHERE id = ?', [req.authUser.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+    }
+
+    if (rows[0].password !== old_password) {
+      return res.status(400).json({ error: 'Mật khẩu cũ không đúng' });
+    }
+
+    // Tạo session token mới (kick tất cả thiết bị cũ)
+    const { randomUUID } = await import('crypto');
+    const newToken = randomUUID();
+
+    await pool.query(
+      'UPDATE account SET password = ?, session_token = ? WHERE id = ?',
+      [new_password, newToken, req.authUser.id]
+    );
+
+    res.json({
+      message: 'Đổi mật khẩu thành công! Các thiết bị khác đã bị đăng xuất.',
+      session_token: newToken, // Trả token mới để thiết bị hiện tại cập nhật
+    });
+  } catch (err) {
+    console.error('POST /api/auth/change-password error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // GET /api/auth/me — Lấy thông tin user mới nhất (refresh cash, vàng, vip)
+// Đồng thời validate session_token để phát hiện phiên bị kick
 app.get('/api/auth/me', async (req, res) => {
   try {
     const { user_id } = req.query;
+    const sessionToken = req.headers['x-session-token'];
     if (!user_id) {
       return res.status(400).json({ error: 'Thiếu user_id' });
     }
     const [rows] = await pool.query(
-      'SELECT id, username, email, is_admin, cash, vang, vip, vnd FROM account WHERE id = ?',
+      'SELECT id, username, email, is_admin, cash, vang, vip, vnd, session_token FROM account WHERE id = ?',
       [Number(user_id)]
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
     }
-    res.json({ user: rows[0] });
+    const account = rows[0];
+    // Nếu client gửi token mà token không khớp → phiên đã bị kick
+    if (sessionToken && account.session_token !== sessionToken) {
+      return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+    const { session_token: _st, ...userWithoutToken } = account;
+    res.json({ user: userWithoutToken });
   } catch (err) {
     console.error('GET /api/auth/me error:', err);
     res.status(500).json({ error: 'Lỗi server' });

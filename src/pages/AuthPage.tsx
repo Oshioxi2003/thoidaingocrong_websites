@@ -112,8 +112,11 @@ export default function AuthPage() {
         return;
       }
 
-      // Lưu user info vào localStorage
+      // Lưu user info + session token vào localStorage
       localStorage.setItem('user', JSON.stringify(data.user));
+      if (data.session_token) {
+        localStorage.setItem('session_token', data.session_token);
+      }
 
       setLoading(false);
       navigate('/');

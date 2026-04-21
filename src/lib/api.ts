@@ -62,8 +62,22 @@ export function getCurrentUser(): { id: number; username: string; email: string;
   return null;
 }
 
+// Lấy session token hiện tại từ localStorage
+export function getSessionToken(): string | null {
+  return localStorage.getItem('session_token');
+}
+
+// Xóa toàn bộ dữ liệu đăng nhập (dùng khi phiên bị kick)
+export function clearAuth() {
+  localStorage.removeItem('user');
+  localStorage.removeItem('session_token');
+  // Phát sự kiện để Navbar và các component khác cập nhật
+  window.dispatchEvent(new CustomEvent('auth:session-expired'));
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const user = getCurrentUser();
+  const sessionToken = getSessionToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string> || {}),
@@ -72,12 +86,20 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   if (user?.id) {
     headers['x-user-id'] = String(user.id);
   }
+  // Gửi x-session-token header để server kiểm tra phiên
+  if (sessionToken) {
+    headers['x-session-token'] = sessionToken;
+  }
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
     headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Lỗi không xác định' }));
+    // Nếu phiên hết hạn (bị kick từ thiết bị khác) → tự động logout
+    if (res.status === 401 && err.code === 'INVALID_SESSION') {
+      clearAuth();
+    }
     throw new Error(err.error || `HTTP ${res.status}`);
   }
   return res.json();
@@ -464,3 +486,43 @@ export async function fetchTransactionColumns(): Promise<{ data: string[] }> {
 export async function fetchGallery(): Promise<{ data: string[] }> {
   return request<{ data: string[] }>('/gallery');
 }
+
+// ============ Auth — Session Management API ============
+
+export async function changePassword(data: {
+  user_id: number;
+  session_token: string;
+  old_password: string;
+  new_password: string;
+}): Promise<{ message: string; session_token: string }> {
+  const res = await fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': String(data.user_id),
+      'x-session-token': data.session_token,
+    },
+    body: JSON.stringify({ old_password: data.old_password, new_password: data.new_password }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+export async function logoutAllDevices(data: {
+  user_id: number;
+  session_token: string;
+}): Promise<{ message: string }> {
+  const res = await fetch('/api/auth/logout-all', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': String(data.user_id),
+      'x-session-token': data.session_token,
+    },
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Moon, Sun, User, LogOut, ChevronDown, FileText, Wallet } from 'lucide-react';
+import { Menu, X, Moon, Sun, User, LogOut, ChevronDown, FileText, Wallet, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from '@/assets/logo.png';
 
@@ -90,8 +90,20 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Lắng nghe sự kiện phiên hết hạn (bị kick từ thiết bị khác)
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+      setDropdownOpen(false);
+      navigate('/auth');
+    };
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, [navigate]);
+
   const handleLogout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('session_token');
     setUser(null);
     setDropdownOpen(false);
     navigate('/');
@@ -182,6 +194,14 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                       {/* Actions */}
                       <div className="p-1.5">
                         <Link
+                          to="/account"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
+                        >
+                          <Settings size={16} className="text-muted-foreground" />
+                          Tài khoản & Bảo mật
+                        </Link>
+                        <Link
                           to="/my-posts"
                           onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
@@ -212,7 +232,7 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
                         >
                           <LogOut size={16} />
-                          Đăng xuất
+                          Đăng xuất thiết bị này
                         </button>
                       </div>
                     </motion.div>
@@ -292,6 +312,14 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                     </div>
                   </div>
                   <Link
+                    to="/account"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    <Settings size={16} className="text-muted-foreground" />
+                    Tài khoản & Bảo mật
+                  </Link>
+                  <Link
                     to="/deposit"
                     onClick={() => setMobileOpen(false)}
                     className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
@@ -304,7 +332,7 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
                     className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
                   >
                     <LogOut size={16} />
-                    Đăng xuất
+                    Đăng xuất thiết bị này
                   </button>
                 </>
               ) : (
