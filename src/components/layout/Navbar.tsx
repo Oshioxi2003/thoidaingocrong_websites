@@ -101,7 +101,21 @@ export default function Navbar({ isDark, onToggleTheme }: NavbarProps) {
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
   }, [navigate]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Gọi API xóa session_token trên server (fire-and-forget, không block UI)
+    const userId = user?.id;
+    const token = localStorage.getItem('session_token');
+    if (userId && token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': String(userId),
+          'x-session-token': token,
+        },
+      }).catch(() => { /* ignore nếu server lỗi */ });
+    }
+    // Xóa localStorage và cập nhật UI ngay không chờ server
     localStorage.removeItem('user');
     localStorage.removeItem('session_token');
     setUser(null);

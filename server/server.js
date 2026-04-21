@@ -240,7 +240,9 @@ async function requireAuth(req, res, next) {
     if (rows[0].ban === 1) {
       return res.status(403).json({ code: 'BANNED', error: 'Tài khoản đã bị khóa' });
     }
-    if (rows[0].session_token !== sessionToken) {
+    // Chỉ reject khi DB có token VÀ token không khớp
+    // Nếu DB token = NULL (user cũ chưa login lại) → vẫn cho qua
+    if (rows[0].session_token !== null && rows[0].session_token !== sessionToken) {
       return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
     }
     req.authUser = rows[0];
@@ -957,6 +959,17 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/logout — Đăng xuất thiết bị hiện tại (xóa token trên server)
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+  try {
+    await pool.query('UPDATE account SET session_token = NULL WHERE id = ?', [req.authUser.id]);
+    res.json({ message: 'Đã đăng xuất' });
+  } catch (err) {
+    console.error('POST /api/auth/logout error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // POST /api/auth/logout-all — Đăng xuất tất cả thiết bị
 // Xóa session_token → tất cả thiết bị sẽ bị kick khi check token
 app.post('/api/auth/logout-all', requireAuth, async (req, res) => {
@@ -1026,8 +1039,9 @@ app.get('/api/auth/me', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
     }
     const account = rows[0];
-    // Nếu client gửi token mà token không khớp → phiên đã bị kick
-    if (sessionToken && account.session_token !== sessionToken) {
+    // Chỉ kick khi DB có token VÀ token không khớp
+    // DB token = NULL (user cũ chưa login lại) → vẫn trả bình thường
+    if (sessionToken && account.session_token !== null && account.session_token !== sessionToken) {
       return res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
     }
     const { session_token: _st, ...userWithoutToken } = account;
