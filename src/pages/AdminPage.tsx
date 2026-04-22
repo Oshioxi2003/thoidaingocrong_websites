@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,7 +7,7 @@ import {
   FileText, Users, Gift, ClipboardCheck, Package, Wallet,
   ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock,
   TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert, SlidersHorizontal, ArrowDownUp, History, Save,
-  BarChart2, Activity, Zap, Crown, AlertCircle, RefreshCw, UserCheck, UserX, Swords
+  BarChart2, Activity, Zap, Crown, AlertCircle, RefreshCw, UserCheck, UserX, Swords, FileDown
 } from 'lucide-react';
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
@@ -2336,6 +2337,93 @@ function RankTable({ title, icon: Icon, rows, cols, colorClass }: {
   );
 }
 
+/* ---- Excel Export Helper ---- */
+function exportReportExcel(data: AdminReport) {
+  const wb = XLSX.utils.book_new();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('vi-VN').replace(/\//g, '-');
+  const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  // ---- Sheet 1: Tổng quan ----
+  const overviewRows = [
+    ['BÁO CÁO TỔNG QUAN HỆ THỐNG', '', `Xuất lúc: ${dateStr} ${timeStr}`],
+    [],
+    ['THÔNG TIN TÀI KHOẢN', '', ''],
+    ['Chỉ số', 'Giá trị', ''],
+    ['Tổng tài khoản', data.accounts.totalAccounts, ''],
+    ['Đang hoạt động', data.accounts.activeAccounts, ''],
+    ['Bị cấm', data.accounts.bannedAccounts, ''],
+    ['Tài khoản Admin', data.accounts.adminAccounts, ''],
+    ['Tổng nhân vật tạo', data.players.totalPlayers, ''],
+    [],
+    ['HOẠT ĐỘNG NGƯỜI DÙNG', '', ''],
+    ['Chỉ số', 'Giá trị', ''],
+    ['Đăng nhập hôm nay', data.activity.loginToday, ''],
+    ['Đăng ký hôm nay', data.activity.registerToday, ''],
+    ['Đăng ký 7 ngày', data.activity.registerWeek, ''],
+    ['Đăng ký 30 ngày', data.activity.registerMonth, ''],
+    [],
+    ['DÒNG TIỀN (có thể không chính xác tuyệt đối)', '', ''],
+    ['Chỉ số', 'Giá trị (VNĐ)', 'Số giao dịch'],
+    ['Tổng đã nạp', data.deposits.totalDepositAmount, data.deposits.totalDepositCount],
+    ['Nạp hôm nay', data.deposits.todayDepositAmount, ''],
+    ['Nạp 7 ngày', data.deposits.weekDepositAmount, ''],
+    ['Chờ duyệt', data.deposits.pendingDepositAmount, data.deposits.pendingDepositCount],
+    ['Trung bình/giao dịch', data.deposits.totalDepositCount > 0 ? Math.round(data.deposits.totalDepositAmount / data.deposits.totalDepositCount) : 0, ''],
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(overviewRows);
+  ws1['!cols'] = [{ wch: 32 }, { wch: 20 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Tổng quan');
+
+  // ---- Sheet 2: Tài khoản mới ----
+  const accHeader = ['ID', 'Tên đăng nhập', 'Email', 'IP Address', 'Cash', 'Ngày đăng ký', 'Trạng thái'];
+  const accRows = data.newAccounts.map(a => [
+    a.id, a.username, a.email, a.ip_address || '', a.cash,
+    new Date(a.create_time).toLocaleString('vi-VN'),
+    a.ban ? 'Bị cấm' : 'Hoạt động',
+  ]);
+  const ws2 = XLSX.utils.aoa_to_sheet([accHeader, ...accRows]);
+  ws2['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 28 }, { wch: 18 }, { wch: 14 }, { wch: 22 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Tài khoản mới');
+
+  // ---- Sheet 3: Top người chơi ----
+  const topRows: any[][] = [
+    ['TOP NẠP NHIỀU NHẤT', '', '', '', 'TOP NHIỆM VỤ NHẤT', '', '', '', 'TOP SỨC MẠNH', ''],
+    ['#', 'Nhân vật', 'Tài khoản', 'Tổng nạp (VNĐ)', '#', 'Nhân vật', 'Tài khoản', 'Nhiệm vụ', '#', 'Nhân vật', 'Tài khoản', 'Sức mạnh'],
+  ];
+  const maxLen = Math.max(data.topDepositors.length, data.topTask.length, data.topPower.length);
+  for (let i = 0; i < maxLen; i++) {
+    const dep = data.topDepositors[i];
+    const task = data.topTask[i];
+    const power = data.topPower[i];
+    topRows.push([
+      dep ? i + 1 : '', dep?.player_name || dep?.username || '', dep ? (dep.player_name ? dep.username : '') : '', dep?.total_deposit ?? '',
+      task ? i + 1 : '', task?.player_name || '', task ? task.username : '', task?.task_count ?? '',
+      power ? i + 1 : '', power?.player_name || '', power ? power.username : '', power?.power ?? '',
+    ]);
+  }
+  const ws3 = XLSX.utils.aoa_to_sheet(topRows);
+  ws3['!cols'] = [{ wch: 4 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 4 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 4 }, { wch: 18 }, { wch: 16 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Top người chơi');
+
+  // ---- Sheet 4: Biểu đồ đăng ký (30 ngày) ----
+  const regHeader = ['Ngày', 'Số đăng ký'];
+  const regRows = data.charts.registerChart.map(r => [r.date, r.count]);
+  const ws4 = XLSX.utils.aoa_to_sheet([regHeader, ...regRows]);
+  ws4['!cols'] = [{ wch: 14 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Đăng ký theo ngày');
+
+  // ---- Sheet 5: Biểu đồ dòng tiền (30 ngày) ----
+  const depHeader = ['Ngày', 'Số tiền (VNĐ)', 'Số giao dịch'];
+  const depRows = data.charts.depositChart.map(r => [r.date, r.amount, r.count]);
+  const ws5 = XLSX.utils.aoa_to_sheet([depHeader, ...depRows]);
+  ws5['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws5, 'Dòng tiền theo ngày');
+
+  // Xuất file
+  XLSX.writeFile(wb, `BaoCao_Admin_${dateStr.replace(/-/g, '')}_${timeStr.replace(':', 'h')}.xlsx`);
+}
+
 function ReportTab() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<AdminReport>({
     queryKey: ['admin-report'],
@@ -2368,7 +2456,7 @@ function ReportTab() {
     );
   }
 
-  const { accounts, players, activity, deposits, charts, topDepositors, topGold, topPower, newAccounts } = data;
+  const { accounts, players, activity, deposits, charts, topDepositors, topTask, topPower, newAccounts } = data;
 
   // Điền các ngày còn thiếu trong 30 ngày để chart đầy đủ
   const fillDays = (raw: { date: string; count?: number; amount?: number }[], days = 30) => {
@@ -2390,19 +2478,105 @@ function ReportTab() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-2xl font-bold text-foreground">Báo cáo tổng quan</h2>
           <p className="mt-1 text-sm text-muted-foreground">Cập nhật tự động mỗi 60 giây • Dữ liệu dòng tiền có thể chưa chính xác tuyệt đối</p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="inline-flex items-center gap-2 rounded-xl bg-muted px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-          Làm mới
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Nút xuất Excel */}
+          <div className="relative group">
+            <button
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition-all"
+            >
+              <FileDown size={15} />
+              Xuất Excel
+              <span className="ml-1 text-emerald-200 text-xs">▾</span>
+            </button>
+            {/* Dropdown */}
+            <div className="absolute right-0 top-full mt-1.5 z-50 hidden group-hover:block min-w-[210px] rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
+              <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground border-b border-border">Chọn nội dung xuất</div>
+              {[
+                { label: '📊 Báo cáo đầy đủ (tất cả sheets)', key: 'all' },
+                { label: '📋 Tổng quan & Dòng tiền', key: 'overview' },
+                { label: '👤 Tài khoản mới nhất', key: 'accounts' },
+                { label: '🏆 Top người chơi', key: 'top' },
+                { label: '📈 Biểu đồ đăng ký (30 ngày)', key: 'reg' },
+                { label: '💰 Biểu đồ dòng tiền (30 ngày)', key: 'dep' },
+              ].map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => {
+                    if (item.key === 'all') { exportReportExcel(data); return; }
+                    // Xuất sheet riêng lẻ
+                    const wb = XLSX.utils.book_new();
+                    const dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+                    if (item.key === 'overview') {
+                      const rows = [
+                        ['BÁO CÁO TỔNG QUAN', '', `Xuất: ${dateStr}`],
+                        [],
+                        ['Chỉ số', 'Giá trị'],
+                        ['Tổng tài khoản', data.accounts.totalAccounts],
+                        ['Đang hoạt động', data.accounts.activeAccounts],
+                        ['Bị cấm', data.accounts.bannedAccounts],
+                        ['Tổng nhân vật', data.players.totalPlayers],
+                        ['Đăng nhập hôm nay', data.activity.loginToday],
+                        ['Đăng ký hôm nay', data.activity.registerToday],
+                        ['Đăng ký 7 ngày', data.activity.registerWeek],
+                        ['Đăng ký 30 ngày', data.activity.registerMonth],
+                        [],
+                        ['Tổng đã nạp (VNĐ)', data.deposits.totalDepositAmount],
+                        ['Số GD thành công', data.deposits.totalDepositCount],
+                        ['Nạp hôm nay (VNĐ)', data.deposits.todayDepositAmount],
+                        ['Nạp 7 ngày (VNĐ)', data.deposits.weekDepositAmount],
+                        ['Chờ duyệt (VNĐ)', data.deposits.pendingDepositAmount],
+                        ['Số GD chờ duyệt', data.deposits.pendingDepositCount],
+                      ];
+                      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tổng quan');
+                      XLSX.writeFile(wb, `TongQuan_${dateStr}.xlsx`);
+                    } else if (item.key === 'accounts') {
+                      const rows = [['ID','Tên đăng nhập','Email','IP','Cash','Ngày đăng ký','Trạng thái'],
+                        ...data.newAccounts.map(a => [a.id, a.username, a.email, a.ip_address||'', a.cash, new Date(a.create_time).toLocaleString('vi-VN'), a.ban?'Bị cấm':'Hoạt động'])];
+                      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tài khoản mới');
+                      XLSX.writeFile(wb, `TaiKhoanMoi_${dateStr}.xlsx`);
+                    } else if (item.key === 'top') {
+                      const h = ['#','Top Nạp - Nhân vật','Top Nạp - Account','Top Nạp (VNĐ)','#','Top NV - Nhân vật','Top NV - Account','Nhiệm vụ','#','Top SM - Nhân vật','Top SM - Account','Sức mạnh'];
+                      const ml = Math.max(data.topDepositors.length, data.topTask.length, data.topPower.length);
+                      const rows = [h, ...Array.from({length: ml}, (_, i) => {
+                        const d2 = data.topDepositors[i], t = data.topTask[i], p = data.topPower[i];
+                        return [d2?i+1:'', d2?.player_name||d2?.username||'', d2?(d2.player_name?d2.username:''):'', d2?.total_deposit??'',
+                                t?i+1:'', t?.player_name||'', t?.username||'', t?.task_count??'',
+                                p?i+1:'', p?.player_name||'', p?.username||'', p?.power??''];
+                      })];
+                      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Top người chơi');
+                      XLSX.writeFile(wb, `TopNguoiChoi_${dateStr}.xlsx`);
+                    } else if (item.key === 'reg') {
+                      const rows = [['Ngày','Số đăng ký'], ...data.charts.registerChart.map(r => [r.date, r.count])];
+                      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Đăng ký theo ngày');
+                      XLSX.writeFile(wb, `DangKy30Ngay_${dateStr}.xlsx`);
+                    } else if (item.key === 'dep') {
+                      const rows = [['Ngày','Số tiền (VNĐ)','Số GD'], ...data.charts.depositChart.map(r => [r.date, r.amount, r.count])];
+                      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Dòng tiền theo ngày');
+                      XLSX.writeFile(wb, `DongTien30Ngay_${dateStr}.xlsx`);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-sm text-foreground hover:bg-muted/60 transition-colors flex items-center gap-2"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Nút làm mới */}
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-2 rounded-xl bg-muted px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+            Làm mới
+          </button>
+        </div>
       </div>
 
       {/* === SECTION 1: Tài khoản === */}
@@ -2498,14 +2672,14 @@ function ReportTab() {
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <RankTable
-              title="Top giàu nhất (Vàng)"
-              icon={Crown}
-              colorClass="text-yellow-500"
-              cols={['Nhân vật', 'Vàng']}
-              rows={topGold.map(r => ({
+              title="Top nhiệm vụ"
+              icon={ClipboardCheck}
+              colorClass="text-violet-400"
+              cols={['Nhân vật', 'Nhiệm vụ']}
+              rows={topTask.map(r => ({
                 name: r.player_name,
                 sub: r.username,
-                value: fmtMoney(r.gold),
+                value: r.task_count.toLocaleString('vi-VN'),
               }))}
             />
           </motion.div>

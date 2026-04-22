@@ -1975,14 +1975,15 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
        LIMIT 10`
     );
 
-    // ---- Top 10 người chơi có vàng nhiều nhất ----
-    const [topGold] = await pool.query(
+    // ---- Top 10 người chơi nhiều nhiệm vụ nhất ----
+    const [topTask] = await pool.query(
       `SELECT p.name as player_name, a.username,
-              CAST(JSON_EXTRACT(p.data_inventory, '$[0]') AS UNSIGNED) as gold
+              CAST(JSON_EXTRACT(p.data_task, '$[0]') AS UNSIGNED) as task_count
        FROM player p
        JOIN account a ON p.account_id = a.id
-       WHERE a.ban = 0 AND JSON_EXTRACT(p.data_inventory, '$[0]') > 0
-       ORDER BY gold DESC
+       WHERE a.ban = 0 AND a.is_admin = 0
+         AND JSON_EXTRACT(p.data_task, '$[0]') > 0
+       ORDER BY task_count DESC
        LIMIT 10`
     );
 
@@ -2022,7 +2023,7 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
         depositChart: depositChart.map(r => ({ date: r.date, amount: Number(r.amount), count: Number(r.count) })),
       },
       topDepositors: topDepositors.map(r => ({ ...r, total_deposit: Number(r.total_deposit) })),
-      topGold: topGold.map(r => ({ ...r, gold: Number(r.gold) })),
+      topTask: topTask.map(r => ({ ...r, task_count: Number(r.task_count) })),
       topPower: topPower.map(r => ({ ...r, power: Number(r.power) })),
       newAccounts,
     });

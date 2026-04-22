@@ -555,7 +555,7 @@ export interface AdminReport {
     depositChart: { date: string; amount: number; count: number }[];
   };
   topDepositors: { username: string; player_name: string | null; total_deposit: number }[];
-  topGold: { player_name: string; username: string; gold: number }[];
+  topTask: { player_name: string; username: string; task_count: number }[];
   topPower: { player_name: string; username: string; power: number }[];
   newAccounts: { id: number; username: string; email: string; create_time: string; ip_address: string | null; cash: number; ban: number }[];
 }
