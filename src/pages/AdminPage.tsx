@@ -115,7 +115,10 @@ export default function AdminPage() {
       }
       // Xác thực lại từ server để tránh giả mạo localStorage
       try {
-        const res = await fetch(`/api/auth/me?user_id=${user.id}`);
+        const sessionToken = localStorage.getItem('session_token');
+        const res = await fetch(`/api/auth/me?user_id=${user.id}`, {
+          headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+        });
         const data = await res.json();
         if (!res.ok || !data.user || data.user.is_admin !== 1) {
           navigate('/', { replace: true });
