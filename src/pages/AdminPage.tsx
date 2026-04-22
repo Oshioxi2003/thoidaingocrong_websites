@@ -2388,8 +2388,8 @@ function exportReportExcel(data: AdminReport) {
 
   // ---- Sheet 3: Top người chơi ----
   const topRows: any[][] = [
-    ['TOP NẠP NHIỀU NHẤT', '', '', '', 'TOP NHIỆM VỤ NHẤT', '', '', '', 'TOP SỨC MẠNH', ''],
-    ['#', 'Nhân vật', 'Tài khoản', 'Tổng nạp (VNĐ)', '#', 'Nhân vật', 'Tài khoản', 'Nhiệm vụ', '#', 'Nhân vật', 'Tài khoản', 'Sức mạnh'],
+    ['TOP NẠP NHIỀU NHẤT', '', '', '', 'TOP NHIỆM VỤ NHẤT', '', '', '', '', 'TOP SỨC MẠNH', ''],
+    ['#', 'Nhân vật', 'Tài khoản', 'Tổng nạp (VNĐ)', '#', 'Nhân vật', 'Tài khoản', 'Task ID', 'Thời gian', '#', 'Nhân vật', 'Tài khoản', 'Sức mạnh'],
   ];
   const maxLen = Math.max(data.topDepositors.length, data.topTask.length, data.topPower.length);
   for (let i = 0; i < maxLen; i++) {
@@ -2398,7 +2398,7 @@ function exportReportExcel(data: AdminReport) {
     const power = data.topPower[i];
     topRows.push([
       dep ? i + 1 : '', dep?.player_name || dep?.username || '', dep ? (dep.player_name ? dep.username : '') : '', dep?.total_deposit ?? '',
-      task ? i + 1 : '', task?.player_name || '', task ? task.username : '', task?.task_count ?? '',
+      task ? i + 1 : '', task?.player_name || '', task ? task.username : '', task?.task_id ?? '', task?.timestamp ? new Date(task.timestamp).toLocaleString('vi-VN') : '',
       power ? i + 1 : '', power?.player_name || '', power ? power.username : '', power?.power ?? '',
     ]);
   }
@@ -2540,12 +2540,12 @@ function ReportTab() {
                       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tài khoản mới');
                       XLSX.writeFile(wb, `TaiKhoanMoi_${dateStr}.xlsx`);
                     } else if (item.key === 'top') {
-                      const h = ['#','Top Nạp - Nhân vật','Top Nạp - Account','Top Nạp (VNĐ)','#','Top NV - Nhân vật','Top NV - Account','Nhiệm vụ','#','Top SM - Nhân vật','Top SM - Account','Sức mạnh'];
+                      const h = ['#','Top Nạp - Nhân vật','Top Nạp - Account','Top Nạp (VNĐ)','#','Top NV - Nhân vật','Top NV - Account','Task ID','Thời gian','#','Top SM - Nhân vật','Top SM - Account','Sức mạnh'];
                       const ml = Math.max(data.topDepositors.length, data.topTask.length, data.topPower.length);
                       const rows = [h, ...Array.from({length: ml}, (_, i) => {
                         const d2 = data.topDepositors[i], t = data.topTask[i], p = data.topPower[i];
                         return [d2?i+1:'', d2?.player_name||d2?.username||'', d2?(d2.player_name?d2.username:''):'', d2?.total_deposit??'',
-                                t?i+1:'', t?.player_name||'', t?.username||'', t?.task_count??'',
+                                t?i+1:'', t?.player_name||'', t?.username||'', t?.task_id??'', t?.timestamp ? new Date(t.timestamp).toLocaleString('vi-VN') : '',
                                 p?i+1:'', p?.player_name||'', p?.username||'', p?.power??''];
                       })];
                       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Top người chơi');
@@ -2678,8 +2678,8 @@ function ReportTab() {
               cols={['Nhân vật', 'Nhiệm vụ']}
               rows={topTask.map(r => ({
                 name: r.player_name,
-                sub: r.username,
-                value: r.task_count.toLocaleString('vi-VN'),
+                sub: `${r.username} • ${r.task_id}`,
+                value: r.timestamp ? new Date(r.timestamp).toLocaleDateString('vi-VN') : r.task_id,
               }))}
             />
           </motion.div>

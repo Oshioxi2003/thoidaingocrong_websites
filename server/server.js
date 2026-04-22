@@ -1976,16 +1976,42 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
     );
 
     // ---- Top 10 người chơi nhiều nhiệm vụ nhất ----
-    const [topTask] = await pool.query(
-      `SELECT p.name as player_name, a.username,
-              CAST(JSON_EXTRACT(p.data_task, '$[0]') AS UNSIGNED) as task_count
+    // data_task: [main_task, sub_task, unknown, timestamp]
+    // task_id = "task_{main}_{sub}", sort by main DESC, sub DESC, timestamp ASC
+    const [topTaskRows] = await pool.query(
+      `SELECT p.name as player_name, a.username, p.data_task
        FROM player p
        JOIN account a ON p.account_id = a.id
        WHERE a.ban = 0 AND a.is_admin = 0
-         AND JSON_EXTRACT(p.data_task, '$[0]') > 0
-       ORDER BY task_count DESC
-       LIMIT 10`
+         AND JSON_EXTRACT(p.data_task, '$[0]') > 0`
     );
+    const topTaskList = [];
+    for (const row of topTaskRows) {
+      try {
+        const parsed = JSON.parse(row.data_task || '[]');
+        const mainTask = Number(parsed[0]) || 0;
+        const subTask = Number(parsed[1]) || 0;
+        const timestamp = Number(parsed[3]) || 0;
+        if (mainTask > 0) {
+          topTaskList.push({
+            player_name: row.player_name,
+            username: row.username,
+            main_task: mainTask,
+            sub_task: subTask,
+            task_id: `task_${mainTask}_${subTask}`,
+            timestamp,
+          });
+        }
+      } catch { continue; }
+    }
+    topTaskList.sort((a, b) => {
+      if (b.main_task !== a.main_task) return b.main_task - a.main_task;
+      if (b.sub_task !== a.sub_task) return b.sub_task - a.sub_task;
+      // Nếu cùng task, ai hoàn thành sớm hơn (timestamp nhỏ hơn) xếp trước
+      if (a.timestamp && b.timestamp) return a.timestamp - b.timestamp;
+      return 0;
+    });
+    const topTask = topTaskList.slice(0, 10);
 
     // ---- Top 10 người chơi sức mạnh cao nhất ----
     const [topPower] = await pool.query(
@@ -2023,7 +2049,7 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
         depositChart: depositChart.map(r => ({ date: r.date, amount: Number(r.amount), count: Number(r.count) })),
       },
       topDepositors: topDepositors.map(r => ({ ...r, total_deposit: Number(r.total_deposit) })),
-      topTask: topTask.map(r => ({ ...r, task_count: Number(r.task_count) })),
+      topTask: topTask.map(r => ({ player_name: r.player_name, username: r.username, task_id: r.task_id, main_task: r.main_task, sub_task: r.sub_task, timestamp: r.timestamp })),
       topPower: topPower.map(r => ({ ...r, power: Number(r.power) })),
       newAccounts,
     });
@@ -2146,6 +2172,8 @@ app.get('/api/top-server', async (req, res) => {
     const LIMIT = 50;
 
     // ---- TOP NHIỆM VỤ ----
+    // data_task: [main_task, sub_task, unknown, timestamp]
+    // task_id = "task_{main}_{sub}", sort by main DESC, sub DESC, timestamp ASC
     const [taskRows] = await pool.query(
       `SELECT p.name, p.data_task FROM player p
        JOIN account a ON p.account_id = a.id
@@ -2155,17 +2183,29 @@ app.get('/api/top-server', async (req, res) => {
     for (const row of taskRows) {
       try {
         const parsed = JSON.parse(row.data_task || '[]');
-        const taskCount = Number(parsed[0]) || 0;
-        if (taskCount > 0) {
-          taskList.push({ name: row.name, value: taskCount });
+        const mainTask = Number(parsed[0]) || 0;
+        const subTask = Number(parsed[1]) || 0;
+        const timestamp = Number(parsed[3]) || 0;
+        if (mainTask > 0) {
+          taskList.push({ name: row.name, mainTask, subTask, timestamp, task_id: `task_${mainTask}_${subTask}` });
         }
       } catch { continue; }
     }
-    taskList.sort((a, b) => b.value - a.value);
+    taskList.sort((a, b) => {
+      if (b.mainTask !== a.mainTask) return b.mainTask - a.mainTask;
+      if (b.subTask !== a.subTask) return b.subTask - a.subTask;
+      // Cùng task → ai hoàn thành sớm hơn (timestamp nhỏ hơn) xếp trước
+      if (a.timestamp && b.timestamp) return a.timestamp - b.timestamp;
+      return 0;
+    });
     const topTask = taskList.slice(0, LIMIT).map((item, i) => ({
       rank: i + 1,
       name: item.name,
-      value: item.value,
+      value: item.mainTask,
+      task_id: item.task_id,
+      main_task: item.mainTask,
+      sub_task: item.subTask,
+      timestamp: item.timestamp,
     }));
 
     // ---- TOP ĐẠI GIA (tổng nạp từ bảng payments) ----

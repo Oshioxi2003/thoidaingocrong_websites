@@ -9,6 +9,10 @@ interface TopEntry {
   name: string;
   value: number;
   pet_power?: number;
+  task_id?: string;
+  main_task?: number;
+  sub_task?: number;
+  timestamp?: number;
 }
 
 interface UserInfo {
@@ -88,6 +92,11 @@ export default function TopServerPage() {
     power: 'Sức mạnh',
   };
 
+  function formatTimestamp(ts?: number): string {
+    if (!ts) return '';
+    return new Date(ts).toLocaleDateString('vi-VN');
+  }
+
   return (
     <div className="min-h-screen pb-20">
       {/* Hero Banner */}
@@ -166,7 +175,7 @@ export default function TopServerPage() {
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Hạng</span>
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nhân vật</span>
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">
-                {valueLabel[tab]}
+                {tab === 'task' ? 'Task ID' : valueLabel[tab]}
               </span>
             </div>
 
@@ -238,6 +247,21 @@ export default function TopServerPage() {
                             <Wallet size={12} />
                             Ẩn
                           </span>
+                        ) : tab === 'task' && entry.task_id ? (
+                          <div className="flex flex-col items-end">
+                            <span className={`font-display text-sm font-bold ${
+                              entry.rank === 1 ? 'text-yellow-400' :
+                              entry.rank <= 3 ? 'text-primary' :
+                              'text-foreground'
+                            }`}>
+                              {entry.task_id}
+                            </span>
+                            {entry.timestamp ? (
+                              <span className="text-[10px] text-muted-foreground">
+                                {formatTimestamp(entry.timestamp)}
+                              </span>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className={`font-display text-sm font-bold ${
                             entry.rank === 1 ? 'text-yellow-400' :
