@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Users, Gift, ClipboardCheck, Package, Wallet,
   ChevronLeft, Menu, LogOut, Plus, Search, Trash2, Edit, Eye, Ban, CheckCircle, X, XCircle, Clock,
-  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert, SlidersHorizontal, ArrowDownUp, History, Save
+  TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, ShieldAlert, SlidersHorizontal, ArrowDownUp, History, Save,
+  BarChart2, Activity, Zap, Crown, AlertCircle, RefreshCw, UserCheck, UserX, Swords
 } from 'lucide-react';
 import {
   fetchPosts, deletePost, fetchPendingPosts, approvePost,
@@ -14,10 +15,10 @@ import {
   fetchPlayers, fetchPlayerInventory, addInventoryItem, deleteInventoryItem, fetchItemTemplates,
   fetchAdminDeposits, fetchDepositStats, approveDeposit, getCurrentUser,
   fetchTransactions, fetchTransactionColumns,
-  updatePlayerStats,
+  updatePlayerStats, fetchAdminReport,
   type Post, type User, type Giftcode, type Player, type InventoryItem, type ItemTemplate,
   type ItemOption, type GiftcodeDetailItem, type DepositOrder, type DepositStats,
-  type HistoryTransaction
+  type HistoryTransaction, type AdminReport
 } from '@/lib/api';
 
 /* ============ SHARED PAGINATION ============ */
@@ -82,9 +83,10 @@ function PerPageSelector({ perPage, onChange }: { perPage: number; onChange: (n:
   );
 }
 
-type Tab = 'posts' | 'approval' | 'users' | 'giftcodes' | 'inventory' | 'deposits' | 'transactions';
+type Tab = 'report' | 'posts' | 'approval' | 'users' | 'giftcodes' | 'inventory' | 'deposits' | 'transactions';
 
 const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
+  { key: 'report', label: 'Báo cáo', icon: BarChart2 },
   { key: 'posts', label: 'Bài viết', icon: FileText },
   { key: 'approval', label: 'Duyệt bài', icon: ClipboardCheck },
   { key: 'users', label: 'Người dùng', icon: Users },
@@ -95,7 +97,7 @@ const tabs: { key: Tab; label: string; icon: typeof FileText }[] = [
 ];
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('posts');
+  const [activeTab, setActiveTab] = useState<Tab>('report');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -202,6 +204,7 @@ export default function AdminPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
+          {activeTab === 'report' && <ReportTab />}
           {activeTab === 'posts' && <PostsTab />}
           {activeTab === 'approval' && <ApprovalTab />}
           {activeTab === 'users' && <UsersTab />}
@@ -2223,3 +2226,350 @@ function TransactionsTab() {
     </div>
   );
 }
+
+/* ============ REPORT ============ */
+
+function fmtMoney(n: number) {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toLocaleString('vi-VN');
+}
+
+function fmtVND(n: number) {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B ₫`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M ₫`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K ₫`;
+  return n.toLocaleString('vi-VN') + ' ₫';
+}
+
+function MiniBarChart({ data, valueKey, labelKey, colorClass = 'bg-primary', height = 80 }: {
+  data: any[]; valueKey: string; labelKey: string; colorClass?: string; height?: number;
+}) {
+  const max = Math.max(...data.map(d => d[valueKey]), 1);
+  return (
+    <div className="flex items-end gap-0.5" style={{ height }}>
+      {data.map((d, i) => (
+        <div key={i} className="group relative flex-1 flex flex-col items-center justify-end" style={{ height }}>
+          <div
+            className={`w-full rounded-t-sm ${colorClass} opacity-80 transition-all group-hover:opacity-100`}
+            style={{ height: `${Math.max(2, (d[valueKey] / max) * (height - 20))}px` }}
+          />
+          {/* Tooltip */}
+          <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-10 pointer-events-none">
+            <div className="rounded-lg bg-popover border border-border px-2 py-1 shadow-lg text-[10px] text-foreground font-semibold whitespace-nowrap">
+              {typeof d[valueKey] === 'number' && d[valueKey] > 100000
+                ? fmtVND(d[valueKey])
+                : d[valueKey].toLocaleString()}
+            </div>
+            <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-border" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, sub, color = 'text-primary', glowColor = 'shadow-primary/20', delay = 0 }: {
+  icon: any; label: string; value: string | number; sub?: string; color?: string; glowColor?: string; delay?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className={`rounded-2xl border border-border bg-card p-5 shadow-lg ${glowColor}`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`rounded-xl p-2.5 bg-current/10 ${color}`}>
+          <Icon size={20} />
+        </div>
+      </div>
+      <p className="text-2xl font-bold text-foreground font-display">{typeof value === 'number' ? value.toLocaleString('vi-VN') : value}</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">{label}</p>
+      {sub && <p className="mt-1 text-xs text-muted-foreground/70">{sub}</p>}
+    </motion.div>
+  );
+}
+
+function RankTable({ title, icon: Icon, rows, cols, colorClass }: {
+  title: string; icon: any;
+  rows: { rank?: number; name: string; sub?: string; value: string }[];
+  cols: [string, string]; colorClass?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className={`px-5 py-4 border-b border-border flex items-center gap-2`}>
+        <Icon size={16} className={colorClass || 'text-primary'} />
+        <h3 className="font-display font-bold text-sm text-foreground">{title}</h3>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/30">
+            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">#</th>
+            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{cols[0]}</th>
+            <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">{cols[1]}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
+              <td className="px-4 py-2.5">
+                {i === 0 ? <span className="text-yellow-400 font-bold">🥇</span>
+                  : i === 1 ? <span className="text-slate-400 font-bold">🥈</span>
+                  : i === 2 ? <span className="text-amber-600 font-bold">🥉</span>
+                  : <span className="text-xs text-muted-foreground font-mono">{i + 1}</span>}
+              </td>
+              <td className="px-4 py-2.5">
+                <p className="font-medium text-foreground text-sm">{r.name}</p>
+                {r.sub && <p className="text-xs text-muted-foreground">{r.sub}</p>}
+              </td>
+              <td className="px-4 py-2.5 text-right font-semibold text-foreground text-sm">{r.value}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-muted-foreground">Chưa có dữ liệu</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ReportTab() {
+  const { data, isLoading, error, refetch, isFetching } = useQuery<AdminReport>({
+    queryKey: ['admin-report'],
+    queryFn: fetchAdminReport,
+    refetchInterval: 60_000, // auto-refresh mỗi 60 giây
+  });
+
+  if (isLoading) {
+    return (
+      <div className="py-32 flex flex-col items-center gap-4 text-muted-foreground">
+        <motion.div
+          className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        />
+        <p className="text-sm">Đang tải báo cáo...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="py-20 text-center">
+        <AlertCircle size={40} className="mx-auto mb-3 text-destructive/50" />
+        <p className="text-muted-foreground">Không thể tải dữ liệu báo cáo.</p>
+        <button onClick={() => refetch()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors">
+          <RefreshCw size={14} /> Thử lại
+        </button>
+      </div>
+    );
+  }
+
+  const { accounts, players, activity, deposits, charts, topDepositors, topGold, topPower, newAccounts } = data;
+
+  // Điền các ngày còn thiếu trong 30 ngày để chart đầy đủ
+  const fillDays = (raw: { date: string; count?: number; amount?: number }[], days = 30) => {
+    const map: Record<string, any> = {};
+    raw.forEach(r => { map[r.date?.toString().slice(0, 10)] = r; });
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      result.push(map[key] || { date: key, count: 0, amount: 0 });
+    }
+    return result;
+  };
+
+  const regChartFull = fillDays(charts.registerChart, 14);
+  const depChartFull = fillDays(charts.depositChart, 14);
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-2xl font-bold text-foreground">Báo cáo tổng quan</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Cập nhật tự động mỗi 60 giây • Dữ liệu dòng tiền có thể chưa chính xác tuyệt đối</p>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="inline-flex items-center gap-2 rounded-xl bg-muted px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+          Làm mới
+        </button>
+      </div>
+
+      {/* === SECTION 1: Tài khoản === */}
+      <section>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+          <Users size={13} /> Người dùng &amp; Nhân vật
+        </h3>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard icon={Users} label="Tổng tài khoản" value={accounts.totalAccounts} color="text-primary" delay={0} />
+          <StatCard icon={Activity} label="Nhân vật tạo" value={players.totalPlayers} color="text-emerald-500" delay={0.04} />
+          <StatCard icon={UserCheck} label="Đang hoạt động" value={accounts.activeAccounts} color="text-blue-400" delay={0.08} />
+          <StatCard icon={UserX} label="Bị cấm" value={accounts.bannedAccounts} color="text-destructive" delay={0.12} />
+          <StatCard icon={Activity} label="Đăng nhập hôm nay" value={activity.loginToday} color="text-violet-400" delay={0.16} />
+          <StatCard icon={Plus} label="Đăng ký hôm nay" value={activity.registerToday}
+            sub={`7 ngày: ${activity.registerWeek.toLocaleString()} • 30 ngày: ${activity.registerMonth.toLocaleString()}`}
+            color="text-amber-400" delay={0.20} />
+        </div>
+      </section>
+
+      {/* === SECTION 2: Dòng tiền === */}
+      <section>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+          <DollarSign size={13} /> Dòng tiền
+          <span className="rounded-full bg-yellow-500/10 px-2 py-0.5 text-yellow-500 text-[10px] normal-case font-medium tracking-normal">Có thể không chính xác tuyệt đối</span>
+        </h3>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard icon={DollarSign} label="Tổng đã nạp" value={fmtVND(deposits.totalDepositAmount)}
+            sub={`${deposits.totalDepositCount.toLocaleString()} giao dịch`} color="text-emerald-500" glowColor="shadow-emerald-500/10" delay={0} />
+          <StatCard icon={TrendingUp} label="Hôm nay" value={fmtVND(deposits.todayDepositAmount)} color="text-primary" delay={0.04} />
+          <StatCard icon={ArrowUpRight} label="7 ngày" value={fmtVND(deposits.weekDepositAmount)} color="text-blue-400" delay={0.08} />
+          <StatCard icon={Clock} label="Chờ duyệt" value={deposits.pendingDepositCount}
+            sub={fmtVND(deposits.pendingDepositAmount)} color="text-yellow-400" delay={0.12} />
+          <StatCard icon={ShieldAlert} label="Trung bình/giao dịch"
+            value={deposits.totalDepositCount > 0 ? fmtVND(Math.round(deposits.totalDepositAmount / deposits.totalDepositCount)) : '—'}
+            color="text-violet-400" delay={0.16} />
+          <StatCard icon={Crown} label="Admin" value={accounts.adminAccounts} sub="Tài khoản quản trị" color="text-amber-500" delay={0.20} />
+        </div>
+      </section>
+
+      {/* === SECTION 3: Biểu đồ === */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        {/* Đăng ký 14 ngày */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="font-display text-sm font-bold text-foreground">Đăng ký tài khoản (14 ngày)</h4>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              Tổng: {regChartFull.reduce((s, d) => s + (d.count || 0), 0).toLocaleString()}
+            </span>
+          </div>
+          <MiniBarChart data={regChartFull} valueKey="count" labelKey="date" colorClass="bg-primary" height={100} />
+          <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
+            <span>{regChartFull[0]?.date?.slice(5)}</span>
+            <span>{regChartFull[regChartFull.length - 1]?.date?.slice(5)}</span>
+          </div>
+        </motion.div>
+
+        {/* Nạp tiền 14 ngày */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="font-display text-sm font-bold text-foreground">Dòng tiền (14 ngày)</h4>
+            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-500">
+              {fmtVND(depChartFull.reduce((s, d) => s + (d.amount || 0), 0))}
+            </span>
+          </div>
+          <MiniBarChart data={depChartFull} valueKey="amount" labelKey="date" colorClass="bg-emerald-500" height={100} />
+          <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
+            <span>{depChartFull[0]?.date?.slice(5)}</span>
+            <span>{depChartFull[depChartFull.length - 1]?.date?.slice(5)}</span>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* === SECTION 4: Bảng xếp hạng === */}
+      <section>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+          <Crown size={13} /> Bảng xếp hạng người chơi
+        </h3>
+        <div className="grid gap-5 lg:grid-cols-3">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <RankTable
+              title="Top nạp nhiều nhất"
+              icon={DollarSign}
+              colorClass="text-emerald-500"
+              cols={['Người chơi', 'Tổng nạp']}
+              rows={topDepositors.map(r => ({
+                name: r.player_name || r.username,
+                sub: r.player_name ? r.username : undefined,
+                value: fmtVND(r.total_deposit),
+              }))}
+            />
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <RankTable
+              title="Top giàu nhất (Vàng)"
+              icon={Crown}
+              colorClass="text-yellow-500"
+              cols={['Nhân vật', 'Vàng']}
+              rows={topGold.map(r => ({
+                name: r.player_name,
+                sub: r.username,
+                value: fmtMoney(r.gold),
+              }))}
+            />
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}>
+            <RankTable
+              title="Top sức mạnh"
+              icon={Swords}
+              colorClass="text-red-400"
+              cols={['Nhân vật', 'Sức mạnh']}
+              rows={topPower.map(r => ({
+                name: r.player_name,
+                sub: r.username,
+                value: fmtMoney(r.power),
+              }))}
+            />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* === SECTION 5: Tài khoản đăng ký mới === */}
+      <section>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+          <Activity size={13} /> Tài khoản đăng ký gần đây
+        </h3>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Tên đăng nhập</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Email</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">IP</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Cash</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Ngày đăng ký</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {newAccounts.map((acc, i) => (
+                <tr key={acc.id} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">#{acc.id}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{acc.username}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{acc.email}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{acc.ip_address || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{acc.cash.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {new Date(acc.create_time).toLocaleString('vi-VN')}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${acc.ban ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                      {acc.ban ? 'Bị cấm' : 'Hoạt động'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {newAccounts.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">Chưa có dữ liệu</td></tr>
+              )}
+            </tbody>
+          </table>
+        </motion.div>
+      </section>
+    </div>
+  );
+}
+

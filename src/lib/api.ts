@@ -526,3 +526,41 @@ export async function logoutAllDevices(data: {
   return json;
 }
 
+// ============ Admin — Report API ============
+
+export interface AdminReport {
+  accounts: {
+    totalAccounts: number;
+    activeAccounts: number;
+    bannedAccounts: number;
+    adminAccounts: number;
+  };
+  players: { totalPlayers: number };
+  activity: {
+    loginToday: number;
+    registerToday: number;
+    registerWeek: number;
+    registerMonth: number;
+  };
+  deposits: {
+    totalDepositAmount: number;
+    totalDepositCount: number;
+    pendingDepositAmount: number;
+    pendingDepositCount: number;
+    todayDepositAmount: number;
+    weekDepositAmount: number;
+  };
+  charts: {
+    registerChart: { date: string; count: number }[];
+    depositChart: { date: string; amount: number; count: number }[];
+  };
+  topDepositors: { username: string; player_name: string | null; total_deposit: number }[];
+  topGold: { player_name: string; username: string; gold: number }[];
+  topPower: { player_name: string; username: string; power: number }[];
+  newAccounts: { id: number; username: string; email: string; create_time: string; ip_address: string | null; cash: number; ban: number }[];
+}
+
+export async function fetchAdminReport(): Promise<AdminReport> {
+  return request<AdminReport>('/admin/report');
+}
+

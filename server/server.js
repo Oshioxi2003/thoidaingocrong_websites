@@ -1896,6 +1896,142 @@ app.get('/api/admin/transactions/columns', requireAdmin, async (req, res) => {
   }
 });
 
+// ======================== ADMIN — BÁO CÁO TỔNG HỢP ========================
+
+// GET /api/admin/report — Báo cáo tổng quan hệ thống
+app.get('/api/admin/report', requireAdmin, async (req, res) => {
+  try {
+    // ---- Tổng số tài khoản ----
+    const [[{ totalAccounts }]] = await pool.query('SELECT COUNT(*) as totalAccounts FROM account');
+    const [[{ activeAccounts }]] = await pool.query('SELECT COUNT(*) as activeAccounts FROM account WHERE ban = 0');
+    const [[{ bannedAccounts }]] = await pool.query('SELECT COUNT(*) as bannedAccounts FROM account WHERE ban = 1');
+    const [[{ adminAccounts }]] = await pool.query('SELECT COUNT(*) as adminAccounts FROM account WHERE is_admin = 1');
+
+    // ---- Tổng số nhân vật (người chơi) ----
+    const [[{ totalPlayers }]] = await pool.query('SELECT COUNT(*) as totalPlayers FROM player');
+
+    // ---- Tài khoản đăng nhập hôm nay (last_time_login = today) ----
+    const [[{ loginToday }]] = await pool.query(
+      "SELECT COUNT(*) as loginToday FROM account WHERE DATE(last_time_login) = CURDATE()"
+    );
+    // ---- Tài khoản đăng ký hôm nay ----
+    const [[{ registerToday }]] = await pool.query(
+      "SELECT COUNT(*) as registerToday FROM account WHERE DATE(create_time) = CURDATE()"
+    );
+    // ---- Tài khoản đăng ký 7 ngày qua ----
+    const [[{ registerWeek }]] = await pool.query(
+      "SELECT COUNT(*) as registerWeek FROM account WHERE create_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    );
+    // ---- Tài khoản đăng ký 30 ngày qua ----
+    const [[{ registerMonth }]] = await pool.query(
+      "SELECT COUNT(*) as registerMonth FROM account WHERE create_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    );
+
+    // ---- Đăng ký theo ngày (30 ngày gần nhất) ----
+    const [registerChart] = await pool.query(
+      `SELECT DATE(create_time) as date, COUNT(*) as count
+       FROM account
+       WHERE create_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+       GROUP BY DATE(create_time)
+       ORDER BY date ASC`
+    );
+
+    // ---- Dòng tiền ----
+    const [[{ totalDepositAmount }]] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as totalDepositAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 1"
+    );
+    const [[{ totalDepositCount }]] = await pool.query(
+      "SELECT COUNT(*) as totalDepositCount FROM payments WHERE transfer_code IS NOT NULL AND status = 1"
+    );
+    const [[{ pendingDepositAmount }]] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as pendingDepositAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 0"
+    );
+    const [[{ pendingDepositCount }]] = await pool.query(
+      "SELECT COUNT(*) as pendingDepositCount FROM payments WHERE transfer_code IS NOT NULL AND status = 0"
+    );
+    const [[{ todayDepositAmount }]] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as todayDepositAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 1 AND DATE(created_at) = CURDATE()"
+    );
+    const [[{ weekDepositAmount }]] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as weekDepositAmount FROM payments WHERE transfer_code IS NOT NULL AND status = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    );
+
+    // ---- Nạp tiền theo ngày (30 ngày gần nhất) ----
+    const [depositChart] = await pool.query(
+      `SELECT DATE(created_at) as date, COALESCE(SUM(amount), 0) as amount, COUNT(*) as count
+       FROM payments
+       WHERE transfer_code IS NOT NULL AND status = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY date ASC`
+    );
+
+    // ---- Top 10 người chơi nạp nhiều nhất ----
+    const [topDepositors] = await pool.query(
+      `SELECT a.username, a.danap as total_deposit, p.name as player_name
+       FROM account a
+       LEFT JOIN player p ON p.account_id = a.id
+       WHERE a.ban = 0 AND a.danap > 0
+       ORDER BY a.danap DESC
+       LIMIT 10`
+    );
+
+    // ---- Top 10 người chơi có vàng nhiều nhất ----
+    const [topGold] = await pool.query(
+      `SELECT p.name as player_name, a.username,
+              CAST(JSON_EXTRACT(p.data_inventory, '$[0]') AS UNSIGNED) as gold
+       FROM player p
+       JOIN account a ON p.account_id = a.id
+       WHERE a.ban = 0 AND JSON_EXTRACT(p.data_inventory, '$[0]') > 0
+       ORDER BY gold DESC
+       LIMIT 10`
+    );
+
+    // ---- Top 10 người chơi sức mạnh cao nhất ----
+    const [topPower] = await pool.query(
+      `SELECT p.name as player_name, a.username,
+              CAST(JSON_EXTRACT(p.data_point, '$[1]') AS UNSIGNED) as power
+       FROM player p
+       JOIN account a ON p.account_id = a.id
+       WHERE a.ban = 0 AND JSON_EXTRACT(p.data_point, '$[1]') > 0
+       ORDER BY power DESC
+       LIMIT 10`
+    );
+
+    // ---- 10 tài khoản đăng ký mới nhất ----
+    const [newAccounts] = await pool.query(
+      `SELECT id, username, email, create_time, ip_address, cash, ban
+       FROM account
+       ORDER BY create_time DESC
+       LIMIT 10`
+    );
+
+    res.json({
+      accounts: { totalAccounts, activeAccounts, bannedAccounts, adminAccounts },
+      players: { totalPlayers },
+      activity: { loginToday, registerToday, registerWeek, registerMonth },
+      deposits: {
+        totalDepositAmount: Number(totalDepositAmount),
+        totalDepositCount: Number(totalDepositCount),
+        pendingDepositAmount: Number(pendingDepositAmount),
+        pendingDepositCount: Number(pendingDepositCount),
+        todayDepositAmount: Number(todayDepositAmount),
+        weekDepositAmount: Number(weekDepositAmount),
+      },
+      charts: {
+        registerChart: registerChart.map(r => ({ date: r.date, count: Number(r.count) })),
+        depositChart: depositChart.map(r => ({ date: r.date, amount: Number(r.amount), count: Number(r.count) })),
+      },
+      topDepositors: topDepositors.map(r => ({ ...r, total_deposit: Number(r.total_deposit) })),
+      topGold: topGold.map(r => ({ ...r, gold: Number(r.gold) })),
+      topPower: topPower.map(r => ({ ...r, power: Number(r.power) })),
+      newAccounts,
+    });
+  } catch (err) {
+    console.error('GET /api/admin/report error:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ======================== SITEMAP.XML (SEO) ========================
 
 /**
